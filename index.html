@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nákupy</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --card: #ffffff;
+    --text: #1f2320;
+    --muted: #6b7069;
+    --accent: #3f7d5c;
+    --accent-soft: #e6efe9;
+    --border: #e4e2dc;
+    --danger: #c2564a;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16181a; --card: #1f2224; --text: #eceae6; --muted: #98a099;
+      --accent: #6fbf94; --accent-soft: #22332a; --border: #2c302d; --danger: #e08277;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16181a; --card: #1f2224; --text: #eceae6; --muted: #98a099;
+    --accent: #6fbf94; --accent-soft: #22332a; --border: #2c302d; --danger: #e08277;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+  }
+  .app { width: 100%; max-width: 480px; height: 100%; display: flex; flex-direction: column; position: relative; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px 10px; }
+  h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  .status { font-size: 11px; color: var(--muted); }
+  main { flex: 1; overflow-y: auto; padding: 0 16px 100px; }
+
+  .tabbar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: center;
+    background: var(--card); border-top: 1px solid var(--border);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .tabbar-inner { width: 100%; max-width: 480px; display: flex; }
+  .tab {
+    flex: 1; border: none; background: transparent; color: var(--muted);
+    padding: 10px 4px 12px; font-size: 11px; display: flex; flex-direction: column;
+    align-items: center; gap: 4px; cursor: pointer;
+  }
+  .tab .ic { font-size: 20px; }
+  .tab.active { color: var(--accent); font-weight: 600; }
+
+  .fab {
+    position: fixed; right: max(20px, calc((100vw - 480px)/2 + 20px));
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+    width: 62px; height: 62px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 32px; line-height: 1; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.28); cursor: pointer; z-index: 30;
+  }
+  .fab:active { transform: scale(0.96); }
+
+  .listcard {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+  }
+  .listcard .title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .listcard .meta { font-size: 12px; color: var(--muted); }
+  .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; }
+
+  .add-row { display: flex; gap: 8px; margin: 14px 0; position: relative; }
+  input[type="text"], input[type="date"], input[type="number"], select {
+    padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 16px; width: 100%;
+  }
+  .add-row input[type="text"] { flex: 1; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  input.error { border-color: var(--danger); }
+  .error-text { color: var(--danger); font-size: 12px; margin-top: 4px; }
+  button.add-btn { background: var(--accent); color: white; border: none; border-radius: 12px; padding: 0 18px; font-weight: 600; cursor: pointer; }
+
+  ul.plain { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li.row {
+    display: flex; align-items: center; gap: 12px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px;
+  }
+  .check {
+    width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--accent);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: transparent; padding: 0; cursor: pointer;
+  }
+  li.done .check { background: var(--accent); }
+  .check svg { width: 14px; height: 14px; opacity: 0; }
+  li.done .check svg { opacity: 1; }
+  .row-text { flex: 1; font-size: 15px; word-break: break-word; }
+  .row-text .row-sub { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  li.done .row-text { text-decoration: line-through; color: var(--muted); }
+  .del { background: transparent; border: none; color: var(--muted); font-size: 18px; padding: 4px 8px; cursor: pointer; }
+  .del:active { color: var(--danger); }
+  .edit { background: transparent; border: none; color: var(--accent); font-size: 16px; padding: 4px 8px; cursor: pointer; }
+  .edit:active { opacity: 0.7; }
+
+  .backbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 12px; }
+  .backbar-left { display: flex; align-items: center; gap: 8px; }
+  .backbtn { background: transparent; border: none; font-size: 22px; color: var(--accent); cursor: pointer; padding: 4px; }
+  .detail-title { font-size: 18px; font-weight: 700; }
+  .editbtn {
+    background: var(--accent-soft); color: var(--accent); border: none; border-radius: 10px;
+    padding: 8px 14px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0;
+  }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: flex-end; justify-content: center; z-index: 50;
+  }
+  .sheet {
+    background: var(--bg); width: 100%; max-width: 480px;
+    border-radius: 18px 18px 0 0; max-height: 90vh; overflow-y: auto;
+    padding: 18px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  .sheet h2 { margin: 0 0 14px; font-size: 18px; }
+  .field-label { font-size: 12px; color: var(--muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .store-pick { display: flex; gap: 8px; flex-wrap: wrap; }
+  .store-chip {
+    padding: 8px 14px; border-radius: 20px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 14px; cursor: pointer;
+  }
+  .store-chip.sel { background: var(--accent); color: white; border-color: var(--accent); }
+
+  .cat-heading { font-size: 12px; font-weight: 700; color: var(--accent); margin: 12px 0 6px; }
+  .pick-row {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px;
+  }
+  .pick-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
+  .pick-row label { flex: 1; font-size: 14px; }
+
+  .sheet-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px; margin-bottom: 6px;
+  }
+  .si-top { display: flex; align-items: center; gap: 8px; }
+  .si-name { flex: 1; font-size: 14px; }
+  .si-qty { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+  .si-qty input { width: 40px; padding: 6px 2px; text-align: center; font-size: 14px; }
+  .si-qty .unit { font-size: 12px; color: var(--muted); margin-left: 2px; }
+  .qtyBtn {
+    width: 26px; height: 26px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--accent-soft); color: var(--accent); font-size: 16px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; flex-shrink: 0;
+  }
+  .note-toggle {
+    background: transparent; border: none; color: var(--accent); font-size: 12px;
+    padding: 6px 0 0; cursor: pointer;
+  }
+  .noteInput { margin-top: 6px; font-size: 14px; padding: 8px 10px; }
+
+  .sheet-actions { display: flex; gap: 10px; margin-top: 20px; }
+  .btn-secondary {
+    flex: 1; background: transparent; border: 1px solid var(--border); color: var(--text);
+    border-radius: 12px; padding: 12px; font-size: 15px; cursor: pointer;
+  }
+  .btn-primary {
+    flex: 1; background: var(--accent); border: none; color: white;
+    border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer;
+  }
+
+  .suggestions {
+    position: absolute; left: 0; right: 96px; top: 100%; margin-top: 4px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; z-index: 10; box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+  }
+  .suggestion-item {
+    display: block; width: 100%; text-align: left; padding: 10px 12px;
+    background: var(--card); border: none; border-bottom: 1px solid var(--border);
+    font-size: 14px; color: var(--text); cursor: pointer;
+  }
+  .suggestion-item:last-child { border-bottom: none; }
+  .suggestion-item:active { background: var(--accent-soft); }
+
+  .addIngredientBtn {
+    background: var(--accent-soft); color: var(--accent); border: none; border-radius: 10px;
+    padding: 8px 12px; font-size: 13px; font-weight: 700; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+  }
+  .addIngredientBtn:disabled { opacity: 0.5; cursor: default; }
+
+  .db-subtabs { display: flex; gap: 8px; margin: 6px 0 14px; }
+  .db-subtab {
+    flex: 1; padding: 9px 6px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+  }
+  .db-subtab.sel { background: var(--accent); color: white; border-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1 id="pageTitle">Nákupné zoznamy</h1>
+    <span class="status" id="status">načítavam…</span>
+  </header>
+  <main id="main"></main>
+
+  <div class="tabbar">
+    <div class="tabbar-inner">
+      <button class="tab active" data-tab="lists"><span class="ic">🛒</span>Zoznamy</button>
+      <button class="tab" data-tab="need"><span class="ic">📝</span>Treba kúpiť</button>
+      <button class="tab" data-tab="meals"><span class="ic">🍲</span>Jedlá</button>
+      <button class="tab" data-tab="catalog"><span class="ic">📦</span>Databáza</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const mainEl = document.getElementById('main');
+  const statusEl = document.getElementById('status');
+  const pageTitle = document.getElementById('pageTitle');
+  const tabs = document.querySelectorAll('.tab');
+
+  const SUPABASE_URL = 'https://qsuinjpanjqwoxdwsjag.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzdWluanBhbmpxd294ZHdzamFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MDY0MzgsImV4cCI6MjEwNTQ4MjQzOH0.M6zGi8y_V-LJIcNL3sdIsoi4STtYK0bAgTruh3qmZ5s';
+  let sb = null;
+
+  let currentTab = 'lists';
+  let detailListId = null;
+  let detailMealId = null;
+  let dbSubTab = 'Kaufland';
+  let catalogSearchQuery = '';
+  let mealSelectedListId = null;
+
+  let lists = [];          // {id, store, date, createdAt}
+  let listItems = [];      // {id, listId, name, qty, note, done, catalogId, needId}
+  let needToBuy = [];      // {id, name}
+  let catalog = [];        // {id, name, store, category}
+  let meals = [];          // {id, name, createdAt}
+  let mealIngredients = [];// {id, mealId, name, catalogId}
+
+  const STORE_OPTIONS = ['Kaufland', 'DM', 'Ostatné'];
+  const MEAL_CATEGORIES = ['Polievky', 'Hlavné jedlá'];
+  const KAUFLAND_CATEGORIES = ['Ovocie a zelenina','Korenia','Konzervy','Omáčky','Veci','Čaje','Pečivo','Pult','Mrazené','Mäso','Mliečne','Cestoviny','Pečenie','Detské','Do mlieka','Slané','Sladké','Upratovanie','Nápoje','Zmrzlina'];
+
+  const todayStr = () => new Date().toISOString().slice(0,10);
+  const fmtDate = (iso) => { const [y,m,d] = iso.split('-'); return `${d}.${m}.${y}`; };
+  function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+  function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+  function catalogHasName(name) {
+    const n = name.trim().toLowerCase();
+    return catalog.some(c => c.name.trim().toLowerCase() === n);
+  }
+  function itemsForList(listId) { return listItems.filter(i => i.listId === listId); }
+  function ingredientsForMeal(mealId) { return mealIngredients.filter(i => i.mealId === mealId); }
+
+  // ---------- ROW MAPPERS ----------
+  const mapListRow = (r) => ({ id: r.id, store: r.store, date: r.list_date, createdAt: r.created_at ? new Date(r.created_at).getTime() : 0 });
+  const mapItemRow = (r) => ({ id: r.id, listId: r.list_id, name: r.name, qty: r.qty || 1, note: r.note || '', done: !!r.done, catalogId: r.catalog_id || undefined, needId: r.need_id || undefined });
+  const mapCatalogRow = (r) => ({ id: r.id, name: r.name, store: r.store, category: r.category || '' });
+  const mapNeedRow = (r) => ({ id: r.id, name: r.name });
+  const mapMealRow = (r) => ({ id: r.id, name: r.name, category: r.category || 'Hlavné jedlá', createdAt: r.created_at ? new Date(r.created_at).getTime() : 0 });
+  const mapMealIngredientRow = (r) => ({ id: r.id, mealId: r.meal_id, name: r.name, catalogId: r.catalog_id || undefined });
+
+  // ---------- REFRESH FROM SUPABASE ----------
+  async function refreshLists() {
+    if (!sb) return;
+    const { data, error } = await sb.from('shopping_lists').select('*').order('list_date', { ascending: false });
+    if (error) { console.error(error); return; }
+    lists = (data || []).map(mapListRow);
+    render();
+  }
+  async function refreshListItems() {
+    if (!sb) return;
+    const { data, error } = await sb.from('shopping_list_items').select('*');
+    if (error) { console.error(error); return; }
+    listItems = (data || []).map(mapItemRow);
+    render();
+  }
+  async function refreshCatalog() {
+    if (!sb) return;
+    const { data, error } = await sb.from('catalog_items').select('*');
+    if (error) { console.error(error); return; }
+    catalog = (data || []).map(mapCatalogRow);
+    render();
+  }
+  async function refreshNeed() {
+    if (!sb) return;
+    const { data, error } = await sb.from('need_to_buy').select('*').order('created_at', { ascending: true });
+    if (error) { console.error(error); return; }
+    needToBuy = (data || []).map(mapNeedRow);
+    render();
+  }
+  async function refreshMeals() {
+    if (!sb) return;
+    const { data, error } = await sb.from('meals').select('*');
+    if (error) { console.error(error); return; }
+    meals = (data || []).map(mapMealRow);
+    render();
+  }
+  async function refreshMealIngredients() {
+    if (!sb) return;
+    const { data, error } = await sb.from('meal_ingredients').select('*');
+    if (error) { console.error(error); return; }
+    mealIngredients = (data || []).map(mapMealIngredientRow);
+    render();
+  }
+  async function resolveOrCreateCatalogId(name) {
+    const existing = catalog.find(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
+    if (!sb) return null;
+    try {
+      const { data, error } = await sb.from('catalog_items').insert({ name, store: 'Kaufland', category: '' }).select().single();
+      if (error) throw error;
+      await refreshCatalog();
+      return data.id;
+    } catch(e) { console.error(e); return null; }
+  }
+
+  // ---------- LOAD SUPABASE-JS (tries a few CDN paths in case one is unavailable) ----------
+  function loadScriptOnce(src) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = src;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('nepodarilo sa načítať ' + src));
+      document.head.appendChild(s);
+    });
+  }
+  async function ensureSupabaseLib() {
+    if (window.supabase && window.supabase.createClient) return true;
+    const candidates = [
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js',
+    ];
+    for (const url of candidates) {
+      try {
+        await loadScriptOnce(url);
+        if (window.supabase && window.supabase.createClient) return true;
+      } catch(e) { /* try next candidate */ }
+    }
+    return false;
+  }
+
+  // ---------- INIT ----------
+  async function init() {
+    try {
+      const ok = await ensureSupabaseLib();
+      if (!ok) { statusEl.textContent = 'chyba: knižnica sa nenačítala'; render(); return; }
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    } catch(e) { sb = null; statusEl.textContent = 'chyba: ' + (e && e.message ? e.message : 'pripojenia'); render(); return; }
+    if (!sb) { statusEl.textContent = 'chyba pripojenia'; render(); return; }
+    statusEl.textContent = 'pripájam…';
+
+    await Promise.all([refreshLists(), refreshListItems(), refreshCatalog(), refreshNeed(), refreshMeals(), refreshMealIngredients()]);
+    statusEl.textContent = 'synchronizované ✓';
+
+    sb.channel('app-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_lists' }, refreshLists)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'shopping_list_items' }, refreshListItems)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'catalog_items' }, refreshCatalog)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'need_to_buy' }, refreshNeed)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meals' }, refreshMeals)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_ingredients' }, refreshMealIngredients)
+      .subscribe();
+  }
+
+  // ---------- ADD-TO-CATALOG PROMPT ----------
+  function offerAddToCatalogSheet(name, defaultStore) {
+    return new Promise((resolve) => {
+      let store = defaultStore || 'Kaufland';
+      let category = KAUFLAND_CATEGORIES[0];
+      const ov = document.createElement('div');
+      ov.className = 'overlay';
+      document.body.appendChild(ov);
+      function draw() {
+        ov.innerHTML = `<div class="sheet" style="max-width:440px;">
+          <h2 style="font-size:16px;">Pridať do databázy?</h2>
+          <p style="font-size:14px;color:var(--muted);margin:0 0 4px;">„${escapeHtml(name)}“ zatiaľ nie je v databáze.</p>
+          <div class="field-label">Kam zaradiť</div>
+          <div class="store-pick">
+            ${STORE_OPTIONS.map(s => `<button type="button" class="store-chip ${s===store?'sel':''}" data-store="${s}">${s}</button>`).join('')}
+          </div>
+          ${store === 'Kaufland' ? `
+          <div class="field-label">Kategória</div>
+          <select id="catSelect">
+            ${KAUFLAND_CATEGORIES.map(c => `<option value="${c}" ${c===category?'selected':''}>${c}</option>`).join('')}
+          </select>` : ''}
+          <div class="sheet-actions">
+            <button class="btn-secondary" id="noBtn">Nepridávať</button>
+            <button class="btn-primary" id="yesBtn">Pridať</button>
+          </div>
+        </div>`;
+        ov.querySelectorAll('.store-chip').forEach(chip => { chip.addEventListener('click', () => { store = chip.dataset.store; draw(); }); });
+        const sel = ov.querySelector('#catSelect');
+        if (sel) sel.addEventListener('change', () => { category = sel.value; });
+        ov.querySelector('#noBtn').addEventListener('click', () => { ov.remove(); resolve(null); });
+        ov.querySelector('#yesBtn').addEventListener('click', () => { ov.remove(); resolve({ store, category: store === 'Kaufland' ? category : '' }); });
+      }
+      draw();
+    });
+  }
+  async function maybeOfferAddToCatalog(name, defaultStore) {
+    if (catalogHasName(name)) return;
+    const result = await offerAddToCatalogSheet(name, defaultStore);
+    if (result && sb) {
+      try { await sb.from('catalog_items').insert({ name, store: result.store, category: result.category || '' }); await refreshCatalog(); } catch(e) { console.error(e); }
+    }
+  }
+
+  // ---------- ROUTER ----------
+  function render() {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === currentTab));
+    document.querySelectorAll('.fab').forEach(f => f.remove());
+
+    if (currentTab === 'lists') {
+      if (detailListId) renderListDetail();
+      else { renderListsTab(); addFab(() => openListSheet(null)); }
+    } else if (currentTab === 'need') {
+      pageTitle.textContent = 'Treba kúpiť';
+      renderNeedTab();
+    } else if (currentTab === 'meals') {
+      if (detailMealId) renderMealDetail();
+      else { pageTitle.textContent = 'Jedlá'; renderMealsTab(); addFab(() => openMealSheet(null)); }
+    } else if (currentTab === 'catalog') {
+      pageTitle.textContent = 'Databáza položiek';
+      renderCatalogTab();
+      addFab(() => openCatalogItemSheet(null));
+    }
+  }
+
+  function addFab(onClick) {
+    const btn = document.createElement('button');
+    btn.className = 'fab';
+    btn.textContent = '+';
+    btn.setAttribute('aria-label', 'Pridať nákupný zoznam');
+    btn.addEventListener('click', onClick);
+    document.querySelector('.app').appendChild(btn);
+  }
+
+  // ---------- TAB: LISTS ----------
+  function renderListsTab() {
+    pageTitle.textContent = 'Nákupné zoznamy';
+    const sorted = [...lists].sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
+    let html = '';
+    if (sorted.length === 0) {
+      html += `<div class="empty">Zatiaľ žiadne zoznamy.<br>Pridaj prvý tlačidlom + vpravo dole.</div>`;
+    } else {
+      html += `<div style="margin-top:6px;">` + sorted.map(l => {
+        const its = itemsForList(l.id);
+        const done = its.filter(i=>i.done).length;
+        const total = its.length;
+        return `<div class="listcard" data-id="${l.id}">
+          <div class="title">${escapeHtml(l.store || 'Zoznam')} - ${fmtDate(l.date || todayStr())}</div>
+          <div class="meta">${done}/${total} položiek hotovo</div>
+        </div>`;
+      }).join('') + `</div>`;
+    }
+    mainEl.innerHTML = html;
+    mainEl.querySelectorAll('.listcard').forEach(el => { el.addEventListener('click', () => { detailListId = el.dataset.id; render(); }); });
+  }
+
+  // ---------- LIST DETAIL (view only) ----------
+  function renderListDetail() {
+    const list = lists.find(l => l.id === detailListId);
+    if (!list) { detailListId = null; renderListsTab(); return; }
+    pageTitle.textContent = 'Zoznam';
+    const items = [...itemsForList(list.id)].sort((a,b) => (a.done===b.done)?0:(a.done?1:-1));
+    let html = `
+      <div class="backbar">
+        <div class="backbar-left">
+          <button class="backbtn" id="backBtn">←</button>
+          <div class="detail-title">${escapeHtml(list.store || 'Zoznam')} - ${fmtDate(list.date || todayStr())}</div>
+        </div>
+        <button class="editbtn" id="editBtn">Upraviť</button>
+      </div>
+      <ul class="plain">`;
+    html += items.map(it => `
+        <li class="row ${it.done?'done':''}">
+          <button class="check" data-id="${it.id}">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          </button>
+          <span class="row-text">${escapeHtml(it.name)} — ${it.qty||1} ks${it.note ? `<span class="row-sub">${escapeHtml(it.note)}</span>` : ''}</span>
+        </li>`).join('');
+    html += `</ul>`;
+    if (items.length === 0) html += `<div class="empty">Žiadne položky. Uprav zoznam a pridaj nejaké.</div>`;
+    mainEl.innerHTML = html;
+
+    document.getElementById('backBtn').addEventListener('click', () => { detailListId = null; render(); });
+    document.getElementById('editBtn').addEventListener('click', () => openListSheet(list));
+    mainEl.querySelectorAll('.check').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const it = listItems.find(i => i.id === btn.dataset.id);
+        if (it) toggleItemDone(it);
+      });
+    });
+  }
+
+  async function toggleItemDone(it) {
+    if (sb) {
+      try { await sb.from('shopping_list_items').update({ done: !it.done }).eq('id', it.id); await refreshListItems(); }
+      catch(e) { console.error(e); }
+    } else { it.done = !it.done; render(); }
+  }
+
+  // ---------- SHARED: catalog checkbox picker (store + Kaufland categories) ----------
+  function buildCatalogPickerHtml(storeTab, isCheckedFn, idPrefix) {
+    const items = catalog.filter(c => c.store === storeTab);
+    if (items.length === 0) return '<div class="empty" style="padding:10px 0;">V tejto databáze zatiaľ nič nie je</div>';
+    const rowHtml = (c) => `
+      <div class="pick-row">
+        <input type="checkbox" id="${idPrefix}-${c.id}" data-id="${c.id}" data-name="${escapeHtml(c.name)}" ${isCheckedFn(c.id)?'checked':''}>
+        <label for="${idPrefix}-${c.id}">${escapeHtml(c.name)}</label>
+      </div>`;
+    if (storeTab !== 'Kaufland') return items.map(rowHtml).join('');
+    let out = '';
+    for (const cat of KAUFLAND_CATEGORIES) {
+      const inCat = items.filter(i => i.category === cat);
+      if (inCat.length === 0) continue;
+      out += `<div class="cat-heading">${cat}</div>` + inCat.map(rowHtml).join('');
+    }
+    const uncategorized = items.filter(i => !i.category || !KAUFLAND_CATEGORIES.includes(i.category));
+    if (uncategorized.length) out += `<div class="cat-heading">Ostatné</div>` + uncategorized.map(rowHtml).join('');
+    return out;
+  }
+
+  // ---------- NEW / EDIT LIST SHEET ----------
+  function openListSheet(existingList) {
+    const isEdit = !!existingList;
+    let selectedStore = isEdit
+      ? (STORE_OPTIONS.includes(existingList.store) ? existingList.store : 'Ostatné')
+      : STORE_OPTIONS[0];
+    let customName = isEdit && !STORE_OPTIONS.includes(existingList.store) ? existingList.store : '';
+    let date = isEdit ? (existingList.date || todayStr()) : todayStr();
+    let sheetItems = isEdit
+      ? itemsForList(existingList.id).map(it => ({ ...it }))
+      : [];
+    const openNotes = new Set(sheetItems.filter(i => i.note).map(i => i.id));
+    let showNameError = false;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+
+    function addSheetItem(entry) { sheetItems.push(entry); renderSheetBody(); }
+    function removeSheetItem(id) { sheetItems = sheetItems.filter(i => i.id !== id); renderSheetBody(); }
+    function bumpQty(id, dir) {
+      const item = sheetItems.find(i => i.id === id);
+      if (item) item.qty = Math.max(1, (item.qty || 1) + dir);
+      renderSheetBody();
+    }
+
+    async function handleManualAdd() {
+      const inp = overlay.querySelector('#manualInput');
+      const v = inp.value.trim();
+      if (!v) return;
+      inp.value = '';
+      addSheetItem({ id: uid(), name: v, qty: 1, note: '', done: false });
+      await maybeOfferAddToCatalog(v, selectedStore);
+    }
+
+    function catalogPickHtml() {
+      return buildCatalogPickerHtml(selectedStore, (id) => sheetItems.some(i => i.catalogId === id), 'cat');
+    }
+
+    function renderSheetBody() {
+      overlay.innerHTML = `
+      <div class="sheet">
+        <h2>${isEdit ? 'Upraviť nákupný zoznam' : 'Nový nákupný zoznam'}</h2>
+
+        <div class="field-label">Databáza / obchod</div>
+        <div class="store-pick" id="storePick">
+          ${STORE_OPTIONS.map(s => `<button type="button" class="store-chip ${s===selectedStore?'sel':''}" data-store="${s}">${s}</button>`).join('')}
+        </div>
+        ${selectedStore === 'Ostatné' ? `
+          <input type="text" id="customNameInput" class="${showNameError?'error':''}" placeholder="Názov zoznamu (povinné)" value="${escapeHtml(customName)}" style="margin-top:8px;">
+          ${showNameError ? '<div class="error-text">Zadaj názov zoznamu</div>' : ''}
+        ` : ''}
+
+        <div class="field-label">Dátum</div>
+        <input type="date" id="dateInput" value="${date}">
+
+        <div class="field-label">Položky v zozname (${sheetItems.length})</div>
+        <div id="currentItems">
+          ${sheetItems.length === 0 ? '<div class="empty" style="padding:10px 0;">Zatiaľ žiadne položky</div>' : sheetItems.map(it => `
+            <div class="sheet-item" data-id="${it.id}">
+              <div class="si-top">
+                <span class="si-name">${escapeHtml(it.name)}</span>
+                <div class="si-qty">
+                  <button type="button" class="qtyBtn" data-id="${it.id}" data-dir="-1">−</button>
+                  <input type="number" min="1" class="qtyInput" data-id="${it.id}" value="${it.qty}">
+                  <button type="button" class="qtyBtn" data-id="${it.id}" data-dir="1">+</button>
+                  <span class="unit">ks</span>
+                </div>
+                <button class="del" data-id="${it.id}">✕</button>
+              </div>
+              ${openNotes.has(it.id)
+                ? `<input type="text" class="noteInput" data-id="${it.id}" placeholder="Poznámka" value="${escapeHtml(it.note)}">`
+                : `<button class="note-toggle" data-id="${it.id}">+ poznámka</button>`}
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="field-label">Pridať z databázy (${selectedStore})</div>
+        <div id="catalogPick">${catalogPickHtml()}</div>
+
+        <div class="field-label">Pridať z "Treba kúpiť"</div>
+        <div id="needPick">
+          ${needToBuy.length === 0 ? '<div class="empty" style="padding:10px 0;">Nič tu nie je</div>' : needToBuy.map(n => `
+            <div class="pick-row">
+              <input type="checkbox" id="need-${n.id}" data-id="${n.id}" data-name="${escapeHtml(n.name)}" ${sheetItems.some(i=>i.needId===n.id)?'checked':''}>
+              <label for="need-${n.id}">${escapeHtml(n.name)}</label>
+            </div>`).join('')}
+        </div>
+
+        <div class="field-label">Pridať manuálne</div>
+        <div class="add-row" style="margin:0 0 6px;">
+          <input type="text" id="manualInput" placeholder="Ďalšia položka…">
+          <button class="add-btn" id="manualAddBtn">+</button>
+        </div>
+
+        <div class="sheet-actions">
+          <button class="btn-secondary" id="cancelBtn">Zrušiť</button>
+          <button class="btn-primary" id="saveBtn">${isEdit ? 'Uložiť zmeny' : 'Vytvoriť zoznam'}</button>
+        </div>
+      </div>`;
+
+      overlay.querySelectorAll('.store-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          selectedStore = chip.dataset.store;
+          showNameError = false;
+          renderSheetBody();
+        });
+      });
+      const nameInput = overlay.querySelector('#customNameInput');
+      if (nameInput) nameInput.addEventListener('input', () => { customName = nameInput.value; });
+
+      overlay.querySelector('#dateInput').addEventListener('change', (e) => { date = e.target.value; });
+
+      overlay.querySelectorAll('.qtyBtn').forEach(btn => {
+        btn.addEventListener('click', () => bumpQty(btn.dataset.id, parseInt(btn.dataset.dir, 10)));
+      });
+      overlay.querySelectorAll('.qtyInput').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const item = sheetItems.find(i => i.id === inp.dataset.id);
+          if (item) item.qty = Math.max(1, parseInt(inp.value, 10) || 1);
+        });
+      });
+      overlay.querySelectorAll('.noteInput').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const item = sheetItems.find(i => i.id === inp.dataset.id);
+          if (item) item.note = inp.value;
+        });
+      });
+      overlay.querySelectorAll('.note-toggle').forEach(btn => {
+        btn.addEventListener('click', () => { openNotes.add(btn.dataset.id); renderSheetBody(); });
+      });
+      overlay.querySelectorAll('#currentItems .del').forEach(btn => {
+        btn.addEventListener('click', () => removeSheetItem(btn.dataset.id));
+      });
+
+      overlay.querySelectorAll('#catalogPick input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) addSheetItem({ id: uid(), name: cb.dataset.name, qty: 1, note: '', done: false, catalogId: cb.dataset.id });
+          else { sheetItems = sheetItems.filter(i => i.catalogId !== cb.dataset.id); renderSheetBody(); }
+        });
+      });
+      overlay.querySelectorAll('#needPick input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) addSheetItem({ id: uid(), name: cb.dataset.name, qty: 1, note: '', done: false, needId: cb.dataset.id });
+          else { sheetItems = sheetItems.filter(i => i.needId !== cb.dataset.id); renderSheetBody(); }
+        });
+      });
+
+      overlay.querySelector('#manualAddBtn').addEventListener('click', handleManualAdd);
+      overlay.querySelector('#manualInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualAdd(); });
+
+      overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('#saveBtn').addEventListener('click', async () => {
+        if (selectedStore === 'Ostatné' && !customName.trim()) { showNameError = true; renderSheetBody(); return; }
+        const finalDate = overlay.querySelector('#dateInput').value || todayStr();
+        const storeName = selectedStore === 'Ostatné' ? customName.trim() : selectedStore;
+        const cleanedItems = sheetItems.map(i => ({ id: i.id, name: i.name, qty: i.qty || 1, note: i.note || '', done: !!i.done, catalogId: i.catalogId, needId: i.needId }));
+        const usedNeedIds = sheetItems.filter(i => i.needId).map(i => i.needId);
+
+        if (sb) {
+          try {
+            let listId = isEdit ? existingList.id : null;
+            if (isEdit) {
+              await sb.from('shopping_lists').update({ store: storeName, list_date: finalDate }).eq('id', listId);
+              await sb.from('shopping_list_items').delete().eq('list_id', listId);
+            } else {
+              const { data: newList, error } = await sb.from('shopping_lists').insert({ store: storeName, list_date: finalDate }).select().single();
+              if (error) throw error;
+              listId = newList.id;
+            }
+            if (cleanedItems.length) {
+              const rows = cleanedItems.map(i => ({ list_id: listId, name: i.name, qty: i.qty, note: i.note, done: i.done, catalog_id: i.catalogId || null, need_id: i.needId || null }));
+              const { error: e2 } = await sb.from('shopping_list_items').insert(rows);
+              if (e2) throw e2;
+            }
+            for (const id of usedNeedIds) { try { await sb.from('need_to_buy').delete().eq('id', id); } catch(e){} }
+            await Promise.all([refreshLists(), refreshListItems(), refreshNeed()]);
+          } catch(e) { console.error(e); }
+        } else {
+          if (isEdit) {
+            existingList.store = storeName; existingList.date = finalDate;
+            listItems = listItems.filter(i => i.listId !== existingList.id).concat(cleanedItems.map(i => ({ ...i, listId: existingList.id })));
+          } else {
+            const newId = uid();
+            lists.push({ id: newId, store: storeName, date: finalDate, createdAt: Date.now() });
+            listItems = listItems.concat(cleanedItems.map(i => ({ ...i, listId: newId })));
+          }
+          render();
+        }
+        overlay.remove();
+        render();
+      });
+    }
+
+    renderSheetBody();
+  }
+
+  // ---------- TAB: MEALS (Jedlá) ----------
+  function renderMealsTab() {
+    pageTitle.textContent = 'Jedlá';
+    const cardHtml = (m) => {
+      const count = ingredientsForMeal(m.id).length;
+      return `<div class="listcard" data-id="${m.id}">
+        <div class="title">${escapeHtml(m.name)}</div>
+        <div class="meta">${count} ${count===1?'ingrediencia':'ingrediencií'}</div>
+      </div>`;
+    };
+    let html = '';
+    if (meals.length === 0) {
+      html = `<div class="empty">Zatiaľ žiadne jedlá.<br>Pridaj prvé tlačidlom + vpravo dole.</div>`;
+    } else {
+      for (const cat of MEAL_CATEGORIES) {
+        const inCat = meals.filter(m => m.category === cat).sort((a,b) => a.name.localeCompare(b.name, 'sk'));
+        if (inCat.length === 0) continue;
+        html += `<div class="cat-heading">${cat}</div><div>` + inCat.map(cardHtml).join('') + `</div>`;
+      }
+      const uncategorized = meals.filter(m => !MEAL_CATEGORIES.includes(m.category)).sort((a,b) => a.name.localeCompare(b.name, 'sk'));
+      if (uncategorized.length) {
+        html += `<div class="cat-heading">Ostatné</div><div>` + uncategorized.map(cardHtml).join('') + `</div>`;
+      }
+    }
+    mainEl.innerHTML = html;
+    mainEl.querySelectorAll('.listcard').forEach(el => { el.addEventListener('click', () => { detailMealId = el.dataset.id; render(); }); });
+  }
+
+  function renderMealDetail() {
+    const meal = meals.find(m => m.id === detailMealId);
+    if (!meal) { detailMealId = null; renderMealsTab(); return; }
+    pageTitle.textContent = 'Jedlo';
+    const ingredients = ingredientsForMeal(meal.id);
+    const sortedLists = [...lists].sort((a,b) => (b.date||'').localeCompare(a.date||'') || (b.createdAt||0)-(a.createdAt||0));
+    if (!mealSelectedListId || !sortedLists.some(l => l.id === mealSelectedListId)) {
+      mealSelectedListId = sortedLists.length ? sortedLists[0].id : null;
+    }
+
+    let html = `
+      <div class="backbar">
+        <div class="backbar-left">
+          <button class="backbtn" id="backBtn">←</button>
+          <div>
+            <div class="detail-title">${escapeHtml(meal.name)}</div>
+            <div class="meta" style="font-size:12px;color:var(--muted);">${escapeHtml(meal.category)}</div>
+          </div>
+        </div>
+        <button class="editbtn" id="editMealBtn">Upraviť</button>
+      </div>`;
+
+    if (sortedLists.length === 0) {
+      html += `<div class="empty">Najprv vytvor nákupný zoznam.</div>
+        <button class="add-btn" id="createListFromMealBtn" style="width:100%;">+ Vytvoriť nákupný zoznam</button>`;
+    } else {
+      html += `<div class="field-label">Pridávať do zoznamu</div>
+        <select id="targetListSelect">
+          ${sortedLists.map(l => `<option value="${l.id}" ${l.id===mealSelectedListId?'selected':''}>${escapeHtml(l.store)} - ${fmtDate(l.date)}</option>`).join('')}
+        </select>`;
+    }
+
+    html += `<div class="field-label" style="margin-top:18px;">Ingrediencie</div>`;
+    if (ingredients.length === 0) {
+      html += `<div class="empty">Žiadne ingrediencie. Uprav jedlo a pridaj nejaké.</div>`;
+    } else {
+      html += `<ul class="plain">` + ingredients.map(ing => `
+        <li class="row">
+          <span class="row-text">${escapeHtml(ing.name)}</span>
+          <button class="addIngredientBtn" data-name="${escapeHtml(ing.name)}" data-catalog-id="${ing.catalogId||''}" ${sortedLists.length===0?'disabled':''}>+ Pridať</button>
+        </li>`).join('') + `</ul>`;
+    }
+    mainEl.innerHTML = html;
+
+    document.getElementById('backBtn').addEventListener('click', () => { detailMealId = null; render(); });
+    document.getElementById('editMealBtn').addEventListener('click', () => openMealSheet(meal));
+    const sel = document.getElementById('targetListSelect');
+    if (sel) sel.addEventListener('change', () => { mealSelectedListId = sel.value; });
+    const createBtn = document.getElementById('createListFromMealBtn');
+    if (createBtn) createBtn.addEventListener('click', () => openListSheet(null));
+
+    mainEl.querySelectorAll('.addIngredientBtn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!mealSelectedListId) return;
+        const original = btn.textContent;
+        btn.textContent = '✓ Pridané';
+        btn.disabled = true;
+        try {
+          if (sb) {
+            await sb.from('shopping_list_items').insert({ list_id: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalog_id: btn.dataset.catalogId || null });
+            await refreshListItems();
+          } else {
+            listItems.push({ id: uid(), listId: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalogId: btn.dataset.catalogId || undefined });
+          }
+        } catch(e) { console.error(e); }
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
+      });
+    });
+  }
+
+  // ---------- NEW / EDIT MEAL SHEET ----------
+  function openMealSheet(existingMeal) {
+    const isEdit = !!existingMeal;
+    let name = isEdit ? existingMeal.name : '';
+    let category = isEdit ? (existingMeal.category || MEAL_CATEGORIES[1]) : MEAL_CATEGORIES[1];
+    let currentIngredients = isEdit ? ingredientsForMeal(existingMeal.id).map(i => ({ ...i })) : [];
+    let sheetStoreTab = 'Kaufland';
+    let showNameError = false;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+
+    function addIngredient(entry) { currentIngredients.push(entry); renderSheetBody(); }
+    function removeIngredient(id) { currentIngredients = currentIngredients.filter(i => i.id !== id); renderSheetBody(); }
+
+    async function handleManualAdd() {
+      const inp = overlay.querySelector('#manualIngredientInput');
+      const v = inp.value.trim();
+      if (!v) return;
+      inp.value = '';
+      const tempId = uid();
+      addIngredient({ id: tempId, name: v, catalogId: undefined });
+      const catId = await resolveOrCreateCatalogId(v);
+      const ing = currentIngredients.find(i => i.id === tempId);
+      if (ing) ing.catalogId = catId || undefined;
+      renderSheetBody();
+    }
+
+    function renderSheetBody() {
+      overlay.innerHTML = `
+      <div class="sheet">
+        <h2>${isEdit ? 'Upraviť jedlo' : 'Nové jedlo'}</h2>
+
+        <div class="field-label">Názov jedla</div>
+        <input type="text" id="mealNameInput" class="${showNameError?'error':''}" value="${escapeHtml(name)}" placeholder="Napr. Kuracie rizoto">
+        ${showNameError ? '<div class="error-text">Zadaj názov jedla</div>' : ''}
+
+        <div class="field-label">Kategória</div>
+        <div class="store-pick" id="mealCatPick">
+          ${MEAL_CATEGORIES.map(c => `<button type="button" class="store-chip ${c===category?'sel':''}" data-cat="${c}">${c}</button>`).join('')}
+        </div>
+
+        <div class="field-label">Ingrediencie (${currentIngredients.length})</div>
+        <div id="currentIngredients">
+          ${currentIngredients.length === 0 ? '<div class="empty" style="padding:10px 0;">Zatiaľ žiadne ingrediencie</div>' : currentIngredients.map(ing => `
+            <div class="sheet-item" data-id="${ing.id}">
+              <div class="si-top">
+                <span class="si-name">${escapeHtml(ing.name)}</span>
+                <button class="del" data-id="${ing.id}">✕</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <div class="field-label">Pridať z databázy</div>
+        <div class="db-subtabs">
+          ${STORE_OPTIONS.map(s => `<button type="button" class="db-subtab ${s===sheetStoreTab?'sel':''}" data-store="${s}">${s}</button>`).join('')}
+        </div>
+        <div id="ingredientCatalogPick">${buildCatalogPickerHtml(sheetStoreTab, (id) => currentIngredients.some(i => i.catalogId === id), 'ming')}</div>
+
+        <div class="field-label">Pridať novú ingredienciu</div>
+        <div class="add-row" style="margin:0 0 6px;">
+          <input type="text" id="manualIngredientInput" placeholder="Nová ingrediencia…">
+          <button class="add-btn" id="manualIngredientAddBtn">+</button>
+        </div>
+
+        <div class="sheet-actions">
+          <button class="btn-secondary" id="cancelBtn">Zrušiť</button>
+          <button class="btn-primary" id="saveMealBtn">${isEdit ? 'Uložiť zmeny' : 'Vytvoriť jedlo'}</button>
+        </div>
+      </div>`;
+
+      overlay.querySelector('#mealNameInput').addEventListener('input', (e) => { name = e.target.value; });
+      overlay.querySelectorAll('#mealCatPick .store-chip').forEach(chip => {
+        chip.addEventListener('click', () => { category = chip.dataset.cat; renderSheetBody(); });
+      });
+      overlay.querySelectorAll('.db-subtab').forEach(btn => {
+        btn.addEventListener('click', () => { sheetStoreTab = btn.dataset.store; renderSheetBody(); });
+      });
+      overlay.querySelectorAll('#currentIngredients .del').forEach(btn => {
+        btn.addEventListener('click', () => removeIngredient(btn.dataset.id));
+      });
+      overlay.querySelectorAll('#ingredientCatalogPick input[type="checkbox"]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) addIngredient({ id: uid(), name: cb.dataset.name, catalogId: cb.dataset.id });
+          else { currentIngredients = currentIngredients.filter(i => i.catalogId !== cb.dataset.id); renderSheetBody(); }
+        });
+      });
+      overlay.querySelector('#manualIngredientAddBtn').addEventListener('click', handleManualAdd);
+      overlay.querySelector('#manualIngredientInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualAdd(); });
+
+      overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('#saveMealBtn').addEventListener('click', async () => {
+        const finalName = name.trim();
+        if (!finalName) { showNameError = true; renderSheetBody(); return; }
+
+        if (sb) {
+          try {
+            let mealId = isEdit ? existingMeal.id : null;
+            if (isEdit) {
+              await sb.from('meals').update({ name: finalName, category }).eq('id', mealId);
+              await sb.from('meal_ingredients').delete().eq('meal_id', mealId);
+            } else {
+              const { data, error } = await sb.from('meals').insert({ name: finalName, category }).select().single();
+              if (error) throw error;
+              mealId = data.id;
+            }
+            if (currentIngredients.length) {
+              const rows = currentIngredients.map(i => ({ meal_id: mealId, name: i.name, catalog_id: i.catalogId || null }));
+              const { error: e2 } = await sb.from('meal_ingredients').insert(rows);
+              if (e2) throw e2;
+            }
+            await Promise.all([refreshMeals(), refreshMealIngredients()]);
+          } catch(e) { console.error(e); }
+        } else {
+          if (isEdit) {
+            existingMeal.name = finalName;
+            existingMeal.category = category;
+            mealIngredients = mealIngredients.filter(i => i.mealId !== existingMeal.id).concat(currentIngredients.map(i => ({ ...i, mealId: existingMeal.id })));
+          } else {
+            const newId = uid();
+            meals.push({ id: newId, name: finalName, category, createdAt: Date.now() });
+            mealIngredients = mealIngredients.concat(currentIngredients.map(i => ({ ...i, mealId: newId })));
+          }
+          render();
+        }
+        overlay.remove();
+        render();
+      });
+    }
+
+    renderSheetBody();
+  }
+
+  // ---------- TAB: TREBA KUPIT ----------
+  function renderNeedTab() {
+    let html = `<div class="add-row">
+      <input type="text" id="needSearch" placeholder="Hľadať alebo pridať položku…" autocomplete="off">
+      <button class="add-btn" id="needAddBtn">Pridať</button>
+      <div class="suggestions" id="needSuggestions" style="display:none;"></div>
+    </div>`;
+    if (needToBuy.length === 0) {
+      html += `<div class="empty">Nič tu zatiaľ nie je.</div>`;
+    } else {
+      html += `<ul class="plain">` + needToBuy.map(n => `
+        <li class="row">
+          <span class="row-text">${escapeHtml(n.name)}</span>
+          <button class="del" data-id="${n.id}">✕</button>
+        </li>`).join('') + `</ul>`;
+    }
+    mainEl.innerHTML = html;
+
+    const searchInput = document.getElementById('needSearch');
+    const suggestBox = document.getElementById('needSuggestions');
+
+    function renderSuggestions() {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+      const matches = catalog.filter(c => c.name.toLowerCase().includes(q)).slice(0, 6);
+      if (matches.length === 0) { suggestBox.style.display = 'none'; suggestBox.innerHTML = ''; return; }
+      suggestBox.style.display = 'block';
+      suggestBox.innerHTML = matches.map(m => `<button type="button" class="suggestion-item" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</button>`).join('');
+      suggestBox.querySelectorAll('.suggestion-item').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          searchInput.value = '';
+          suggestBox.style.display = 'none';
+          await addNeedItem(btn.dataset.name, true);
+        });
+      });
+    }
+    searchInput.addEventListener('input', renderSuggestions);
+
+    async function addNeedItem(name, fromCatalog) {
+      if (!name) return;
+      if (sb) { try { await sb.from('need_to_buy').insert({ name }); await refreshNeed(); } catch(e){console.error(e);} }
+      else { needToBuy.push({id: uid(), name}); render(); }
+      if (!fromCatalog) await maybeOfferAddToCatalog(name);
+    }
+    const addFn = async () => {
+      const v = searchInput.value.trim();
+      if (!v) return;
+      searchInput.value = '';
+      suggestBox.style.display = 'none';
+      await addNeedItem(v, catalogHasName(v));
+    };
+    document.getElementById('needAddBtn').addEventListener('click', addFn);
+    searchInput.addEventListener('keydown', (e) => { if (e.key==='Enter') addFn(); });
+
+    mainEl.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (sb) { try { await sb.from('need_to_buy').delete().eq('id', btn.dataset.id); await refreshNeed(); } catch(e){console.error(e);} }
+        else { needToBuy = needToBuy.filter(n=>n.id!==btn.dataset.id); render(); }
+      });
+    });
+  }
+
+  // ---------- TAB: CATALOG (Kaufland / DM / Ostatné) ----------
+  function renderCatalogTab() {
+    let html = `<div class="db-subtabs">
+      ${STORE_OPTIONS.map(s => `<button type="button" class="db-subtab ${s===dbSubTab?'sel':''}" data-store="${s}">${s}</button>`).join('')}
+    </div>`;
+    html += `<div class="add-row">
+      <input type="text" id="catalogSearch" placeholder="Hľadať položku…" value="${escapeHtml(catalogSearchQuery)}" autocomplete="off">
+    </div>`;
+    html += `<div id="catalogItemsContainer"></div>`;
+    mainEl.innerHTML = html;
+
+    mainEl.querySelectorAll('.db-subtab').forEach(btn => {
+      btn.addEventListener('click', () => { dbSubTab = btn.dataset.store; catalogSearchQuery = ''; render(); });
+    });
+
+    const searchInput = document.getElementById('catalogSearch');
+    searchInput.addEventListener('input', () => { catalogSearchQuery = searchInput.value; renderCatalogItemsList(); });
+
+    renderCatalogItemsList();
+  }
+
+  function renderCatalogItemsList() {
+    const container = document.getElementById('catalogItemsContainer');
+    if (!container) return;
+    const q = catalogSearchQuery.trim().toLowerCase();
+    let items = catalog.filter(c => c.store === dbSubTab);
+    if (q) items = items.filter(c => c.name.toLowerCase().includes(q));
+
+    const rowHtml = (c) => `
+      <li class="row">
+        <span class="row-text">${escapeHtml(c.name)}</span>
+        <button class="edit" data-id="${c.id}">✎</button>
+        <button class="del" data-id="${c.id}">✕</button>
+      </li>`;
+
+    let html = '';
+    if (items.length === 0) {
+      html = `<div class="empty">${q ? 'Nič sa nenašlo.' : 'V tejto databáze zatiaľ nič nie je.'}</div>`;
+    } else if (dbSubTab !== 'Kaufland') {
+      html = `<ul class="plain">` + items.slice().sort((a,b)=>a.name.localeCompare(b.name,'sk')).map(rowHtml).join('') + `</ul>`;
+    } else {
+      for (const cat of KAUFLAND_CATEGORIES) {
+        const inCat = items.filter(i => i.category === cat).sort((a,b)=>a.name.localeCompare(b.name,'sk'));
+        if (inCat.length === 0) continue;
+        html += `<div class="cat-heading">${cat}</div><ul class="plain">` + inCat.map(rowHtml).join('') + `</ul>`;
+      }
+      const uncategorized = items.filter(i => !i.category || !KAUFLAND_CATEGORIES.includes(i.category));
+      if (uncategorized.length) {
+        html += `<div class="cat-heading">Ostatné</div><ul class="plain">` + uncategorized.map(rowHtml).join('') + `</ul>`;
+      }
+    }
+    container.innerHTML = html;
+
+    container.querySelectorAll('.edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = catalog.find(c => c.id === btn.dataset.id);
+        if (item) openCatalogItemSheet(item);
+      });
+    });
+    container.querySelectorAll('.del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (sb) { try { await sb.from('catalog_items').delete().eq('id', btn.dataset.id); await refreshCatalog(); } catch(e){console.error(e);} }
+        else { catalog = catalog.filter(c=>c.id!==btn.dataset.id); renderCatalogItemsList(); }
+      });
+    });
+  }
+
+  // ---------- ADD / EDIT CATALOG ITEM SHEET ----------
+  function openCatalogItemSheet(existingItem) {
+    const isEdit = !!existingItem;
+    const store = isEdit ? existingItem.store : dbSubTab;
+    let name = isEdit ? existingItem.name : '';
+    let category = isEdit ? (existingItem.category || KAUFLAND_CATEGORIES[0]) : KAUFLAND_CATEGORIES[0];
+    let showError = false;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'overlay';
+    document.body.appendChild(overlay);
+
+    function draw() {
+      overlay.innerHTML = `<div class="sheet" style="max-width:440px;">
+        <h2>${isEdit ? 'Upraviť položku' : 'Nová položka'} — ${store}</h2>
+        <div class="field-label">Názov</div>
+        <input type="text" id="nameInput" class="${showError?'error':''}" value="${escapeHtml(name)}" placeholder="Názov položky">
+        ${showError ? '<div class="error-text">Zadaj názov položky</div>' : ''}
+        ${store === 'Kaufland' ? `
+        <div class="field-label">Kategória</div>
+        <select id="categorySelect">
+          ${KAUFLAND_CATEGORIES.map(c => `<option value="${c}" ${c===category?'selected':''}>${c}</option>`).join('')}
+        </select>` : ''}
+        <div class="sheet-actions">
+          <button class="btn-secondary" id="cancelBtn">Zrušiť</button>
+          <button class="btn-primary" id="saveBtn">${isEdit ? 'Uložiť' : 'Pridať'}</button>
+        </div>
+      </div>`;
+
+      overlay.querySelector('#nameInput').addEventListener('input', (e) => { name = e.target.value; });
+      const catSel = overlay.querySelector('#categorySelect');
+      if (catSel) catSel.addEventListener('change', (e) => { category = e.target.value; });
+      overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
+      overlay.querySelector('#saveBtn').addEventListener('click', async () => {
+        const finalName = name.trim();
+        if (!finalName) { showError = true; draw(); return; }
+        const finalCategory = store === 'Kaufland' ? category : '';
+        if (sb) {
+          try {
+            if (isEdit) await sb.from('catalog_items').update({ name: finalName, category: finalCategory }).eq('id', existingItem.id);
+            else await sb.from('catalog_items').insert({ name: finalName, store, category: finalCategory });
+            await refreshCatalog();
+          } catch(e) { console.error(e); }
+        } else {
+          if (isEdit) { existingItem.name = finalName; existingItem.category = finalCategory; }
+          else catalog.push({ id: uid(), name: finalName, store, category: finalCategory });
+          render();
+        }
+        overlay.remove();
+        render();
+      });
+    }
+    draw();
+  }
+
+  tabs.forEach(t => t.addEventListener('click', () => { currentTab = t.dataset.tab; detailListId = null; detailMealId = null; render(); }));
+
+  init();
+})();
+</script>
+</body>
+</html>
