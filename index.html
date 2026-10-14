@@ -660,17 +660,45 @@
         const cat = categoryLabelForItem(it);
         (groups[cat] = groups[cat] || []).push(it);
       }
-      const order = [...KAUFLAND_CATEGORIES, 'Ostatné'];
-      return order.filter(c => groups[c]).map(c => ({ cat: c, rows: groups[c] }));
+      return groups;
     };
-    const columnHtml = (arr, checked) => {
-      const groups = groupByCategory(arr);
-      if (groups.length === 0) return '<div class="pempty">—</div>';
-      return groups.map(g => `
-        <div class="cat-name">${escapeHtml(g.cat)}</div>
-        ${g.rows.map(it => `<div class="prow"><span class="pbox">${checked ? '☑' : '☐'}</span><span>${escapeHtml(it.name)}${it.qty>1?` ×${it.qty}`:''}${it.note ? ` <em>(${escapeHtml(it.note)})</em>` : ''}</span></div>`).join('')}
-      `).join('');
-    };
+    const allGroups = groupByCategory(items);
+    const order = [...KAUFLAND_CATEGORIES, 'Ostatné'].filter(c => allGroups[c]);
+
+    // donut chart for overall completion
+    const r = 48, circ = 2 * Math.PI * r;
+    const donutOffset = circ * (1 - pct / 100);
+    const donutSvg = `
+      <svg width="130" height="130" viewBox="0 0 120 120">
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="#e4e2dc" stroke-width="13"/>
+        <circle cx="60" cy="60" r="${r}" fill="none" stroke="#3f7d5c" stroke-width="13"
+          stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${donutOffset.toFixed(2)}"
+          stroke-linecap="round" transform="rotate(-90 60 60)"/>
+        <text x="60" y="56" text-anchor="middle" font-size="25" font-weight="700" fill="#1f2320" font-family="-apple-system,Arial,sans-serif">${pct}%</text>
+        <text x="60" y="74" text-anchor="middle" font-size="9.5" fill="#6b7069" font-family="-apple-system,Arial,sans-serif">splnené</text>
+      </svg>`;
+
+    // per-category bar breakdown
+    const catBarsHtml = order.map(cat => {
+      const rows = allGroups[cat];
+      const n = rows.length;
+      const b = rows.filter(i => i.done).length;
+      const p = n ? Math.round((b / n) * 100) : 0;
+      return `<div class="cat-row">
+        <div class="cat-row-top"><span>${escapeHtml(cat)}</span><span class="cat-row-count">${b}/${n}</span></div>
+        <div class="bar-track"><div class="bar-fill" style="width:${p}%"></div></div>
+      </div>`;
+    }).join('');
+
+    // missing items — the actionable follow-up, grouped by category
+    const missingGroups = groupByCategory(notBought);
+    const missingOrder = [...KAUFLAND_CATEGORIES, 'Ostatné'].filter(c => missingGroups[c]);
+    const missingHtml = missingOrder.length === 0
+      ? '<div class="pempty">Všetko kúpené — nič nechýba.</div>'
+      : missingOrder.map(cat => `
+          <div class="miss-cat">${escapeHtml(cat)}</div>
+          ${missingGroups[cat].map(it => `<div class="miss-row">• ${escapeHtml(it.name)}${it.qty>1?` ×${it.qty}`:''}${it.note ? ` <em>(${escapeHtml(it.note)})</em>` : ''}</div>`).join('')}
+        `).join('');
 
     const printHtml = `<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8">
 <title>Nákup - ${escapeHtml(list.store||'Zoznam')} - ${fmtDate(list.date||todayStr())}</title>
@@ -678,23 +706,25 @@
   @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color:#1f2320; margin:0; }
-  .header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #1f2320; padding-bottom:10px; margin-bottom:16px; }
+  .header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #1f2320; padding-bottom:10px; margin-bottom:18px; }
   h1 { font-size: 22px; margin: 0; }
   .date { font-size: 12px; color:#6b7069; }
-  .stats { display:flex; gap:10px; margin-bottom:20px; }
-  .stat { flex:1; text-align:center; background:#f7f6f3; border-radius:10px; padding:10px 6px; }
-  .stat-num { font-size:22px; font-weight:700; line-height:1.1; }
-  .stat-label { font-size:10px; color:#6b7069; text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
-  .stat.good .stat-num { color:#3f7d5c; }
-  .stat.bad .stat-num { color:#c2564a; }
-  .cols { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
-  .col-head { font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 10px; padding-bottom:6px; border-bottom:1px solid #e4e2dc; font-weight:700; }
-  .good-head { color:#3f7d5c; }
-  .bad-head { color:#c2564a; }
-  .cat-name { font-size:10.5px; font-weight:700; color:#6b7069; margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
-  .cat-name:first-child { margin-top:0; }
-  .prow { display:flex; gap:6px; font-size:12.5px; padding:1.5px 0; }
-  .pbox { flex-shrink:0; }
+  .top { display:flex; gap:24px; align-items:center; margin-bottom:20px; }
+  .donut-wrap { flex-shrink:0; text-align:center; }
+  .donut-caption { font-size:11px; color:#6b7069; margin-top:2px; }
+  .donut-nums { display:flex; gap:14px; margin-top:8px; justify-content:center; }
+  .donut-num b { font-size:15px; }
+  .cat-bars { flex:1; }
+  .cat-row { margin-bottom:7px; }
+  .cat-row-top { display:flex; justify-content:space-between; font-size:11px; margin-bottom:2px; }
+  .cat-row-count { color:#6b7069; }
+  .bar-track { background:#e4e2dc; border-radius:5px; height:7px; overflow:hidden; }
+  .bar-fill { background:#3f7d5c; height:100%; border-radius:5px; }
+  .section-title { font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#c2564a; margin:0 0 10px; padding-bottom:6px; border-bottom:1px solid #e4e2dc; }
+  .missing-box { background:#fbf2f0; border-radius:12px; padding:14px 16px; column-count:2; column-gap:26px; }
+  .miss-cat { font-size:10.5px; font-weight:700; color:#6b7069; text-transform:uppercase; letter-spacing:.03em; margin:8px 0 2px; break-after:avoid; }
+  .miss-cat:first-child { margin-top:0; }
+  .miss-row { font-size:12.5px; padding:1.5px 0; break-inside:avoid; }
   .pempty { font-size:12px; color:#6b7069; }
 </style></head>
 <body>
@@ -702,22 +732,19 @@
     <h1>${escapeHtml(list.store||'Zoznam')}</h1>
     <div class="date">${fmtDate(list.date||todayStr())}</div>
   </div>
-  <div class="stats">
-    <div class="stat"><div class="stat-num">${total}</div><div class="stat-label">Celkom</div></div>
-    <div class="stat good"><div class="stat-num">${bought.length}</div><div class="stat-label">Kúpené</div></div>
-    <div class="stat bad"><div class="stat-num">${notBought.length}</div><div class="stat-label">Chýba</div></div>
-    <div class="stat"><div class="stat-num">${pct}%</div><div class="stat-label">Splnené</div></div>
-  </div>
-  <div class="cols">
-    <div class="col">
-      <div class="col-head good-head">Kúpené (${bought.length})</div>
-      ${columnHtml(bought, true)}
+  <div class="top">
+    <div class="donut-wrap">
+      ${donutSvg}
+      <div class="donut-nums">
+        <div class="donut-num"><b>${total}</b><br><span style="font-size:9.5px;color:#6b7069;">celkom</span></div>
+        <div class="donut-num"><b style="color:#3f7d5c">${bought.length}</b><br><span style="font-size:9.5px;color:#6b7069;">kúpené</span></div>
+        <div class="donut-num"><b style="color:#c2564a">${notBought.length}</b><br><span style="font-size:9.5px;color:#6b7069;">chýba</span></div>
+      </div>
     </div>
-    <div class="col">
-      <div class="col-head bad-head">Chýba (${notBought.length})</div>
-      ${columnHtml(notBought, false)}
-    </div>
+    <div class="cat-bars">${catBarsHtml}</div>
   </div>
+  <div class="section-title">Čo ešte chýba</div>
+  <div class="missing-box">${missingHtml}</div>
 </body></html>`;
 
     const iframe = document.createElement('iframe');
