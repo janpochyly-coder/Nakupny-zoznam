@@ -870,7 +870,14 @@
         if (selectedStore === 'Ostatné' && !customName.trim()) { showNameError = true; renderSheetBody(); return; }
         const finalDate = overlay.querySelector('#dateInput').value || todayStr();
         const storeName = selectedStore === 'Ostatné' ? customName.trim() : selectedStore;
-        const cleanedItems = sheetItems.map((i, idx) => ({ id: i.id, name: i.name, qty: i.qty || 1, note: i.note || '', done: !!i.done, catalogId: i.catalogId, needId: i.needId, position: idx }));
+        const cleanedItems = sheetItems.map((i, idx) => {
+          let catalogId = i.catalogId;
+          if (!catalogId) {
+            const match = catalog.find(c => c.name.trim().toLowerCase() === i.name.trim().toLowerCase());
+            if (match) catalogId = match.id;
+          }
+          return { id: i.id, name: i.name, qty: i.qty || 1, note: i.note || '', done: !!i.done, catalogId, needId: i.needId, position: idx };
+        });
         const usedNeedIds = sheetItems.filter(i => i.needId).map(i => i.needId);
 
         if (sb) {
