@@ -448,11 +448,18 @@
     });
   }
   async function maybeOfferAddToCatalog(name, defaultStore) {
-    if (catalogHasName(name)) return;
+    const existing = catalog.find(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
+    if (existing) return existing.id;
     const result = await offerAddToCatalogSheet(name, defaultStore);
     if (result && sb) {
-      try { await sb.from('catalog_items').insert({ name, store: result.store, category: result.category || '' }); await refreshCatalog(); } catch(e) { console.error(e); }
+      try {
+        const { data, error } = await sb.from('catalog_items').insert({ name, store: result.store, category: result.category || '' }).select().single();
+        if (error) throw error;
+        await refreshCatalog();
+        return data ? data.id : null;
+      } catch(e) { console.error(e); return null; }
     }
+    return null;
   }
 
   // ---------- ROUTER ----------
@@ -675,8 +682,10 @@
       quickSearchQuery = '';
       const qty = await askQuantity(v);
       if (qty == null) { renderSheetBody(); return; }
-      addSheetItem({ id: uid(), name: v, qty, note: '', done: false });
-      await maybeOfferAddToCatalog(v, selectedStore);
+      const itemId = uid();
+      addSheetItem({ id: itemId, name: v, qty, note: '', done: false });
+      const catalogId = await maybeOfferAddToCatalog(v, selectedStore);
+      if (catalogId) { const it = sheetItems.find(i => i.id === itemId); if (it) it.catalogId = catalogId; }
       renderSheetBody();
     }
 
@@ -849,7 +858,8 @@
           if (cb.checked) {
             const qty = await askQuantity(cb.dataset.name);
             if (qty == null) { renderSheetBody(); return; }
-            addSheetItem({ id: uid(), name: cb.dataset.name, qty, note: '', done: false, needId: cb.dataset.id });
+            const match = catalog.find(c => c.name.trim().toLowerCase() === cb.dataset.name.trim().toLowerCase());
+            addSheetItem({ id: uid(), name: cb.dataset.name, qty, note: '', done: false, needId: cb.dataset.id, catalogId: match ? match.id : undefined });
           } else { sheetItems = sheetItems.filter(i => i.needId !== cb.dataset.id); renderSheetBody(); }
         });
       });
