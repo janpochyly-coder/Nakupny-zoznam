@@ -260,6 +260,7 @@
   const fmtDate = (iso) => { const [y,m,d] = iso.split('-'); return `${d}.${m}.${y}`; };
   function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
   function uid() { return Math.random().toString(36).slice(2,10) + Date.now().toString(36); }
+  function vibrate(ms) { try { if (navigator.vibrate) navigator.vibrate(ms || 15); } catch(e) {} }
   function catalogHasName(name) {
     const n = name.trim().toLowerCase();
     return catalog.some(c => c.name.trim().toLowerCase() === n);
@@ -409,8 +410,8 @@
         ov.querySelectorAll('.store-chip').forEach(chip => { chip.addEventListener('click', () => { store = chip.dataset.store; draw(); }); });
         const sel = ov.querySelector('#catSelect');
         if (sel) sel.addEventListener('change', () => { category = sel.value; });
-        ov.querySelector('#noBtn').addEventListener('click', () => { ov.remove(); resolve(null); });
-        ov.querySelector('#yesBtn').addEventListener('click', () => { ov.remove(); resolve({ store, category: store === 'Kaufland' ? category : '' }); });
+        ov.querySelector('#noBtn').addEventListener('click', () => { vibrate(); ov.remove(); resolve(null); });
+        ov.querySelector('#yesBtn').addEventListener('click', () => { vibrate(); ov.remove(); resolve({ store, category: store === 'Kaufland' ? category : '' }); });
       }
       draw();
     });
@@ -435,13 +436,13 @@
             <button class="btn-primary" id="qtyOk">Pridať</button>
           </div>
         </div>`;
-        ov.querySelector('#qtyMinus').addEventListener('click', () => { qty = Math.max(1, qty - 1); draw(); });
-        ov.querySelector('#qtyPlus').addEventListener('click', () => { qty = qty + 1; draw(); });
+        ov.querySelector('#qtyMinus').addEventListener('click', () => { vibrate(); qty = Math.max(1, qty - 1); draw(); });
+        ov.querySelector('#qtyPlus').addEventListener('click', () => { vibrate(); qty = qty + 1; draw(); });
         const valInput = ov.querySelector('#qtyVal');
         valInput.addEventListener('input', () => { qty = Math.max(1, parseInt(valInput.value, 10) || 1); });
-        valInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { ov.remove(); resolve(Math.max(1, parseInt(valInput.value, 10) || 1)); } });
-        ov.querySelector('#qtyCancel').addEventListener('click', () => { ov.remove(); resolve(null); });
-        ov.querySelector('#qtyOk').addEventListener('click', () => { const v = Math.max(1, parseInt(ov.querySelector('#qtyVal').value, 10) || 1); ov.remove(); resolve(v); });
+        valInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { vibrate(); ov.remove(); resolve(Math.max(1, parseInt(valInput.value, 10) || 1)); } });
+        ov.querySelector('#qtyCancel').addEventListener('click', () => { vibrate(); ov.remove(); resolve(null); });
+        ov.querySelector('#qtyOk').addEventListener('click', () => { vibrate(); const v = Math.max(1, parseInt(ov.querySelector('#qtyVal').value, 10) || 1); ov.remove(); resolve(v); });
       }
       draw();
     });
@@ -583,6 +584,7 @@
   }
 
   async function toggleItemDone(it) {
+    vibrate();
     if (sb) {
       try { await sb.from('shopping_list_items').update({ done: !it.done }).eq('id', it.id); await refreshListItems(); }
       catch(e) { console.error(e); }
@@ -631,9 +633,10 @@
     overlay.className = 'overlay';
     document.body.appendChild(overlay);
 
-    function addSheetItem(entry) { sheetItems.push(entry); renderSheetBody(); }
-    function removeSheetItem(id) { sheetItems = sheetItems.filter(i => i.id !== id); renderSheetBody(); }
+    function addSheetItem(entry) { vibrate(); sheetItems.push(entry); renderSheetBody(); }
+    function removeSheetItem(id) { vibrate(); sheetItems = sheetItems.filter(i => i.id !== id); renderSheetBody(); }
     function bumpQty(id, dir) {
+      vibrate();
       const item = sheetItems.find(i => i.id === id);
       if (item) item.qty = Math.max(1, (item.qty || 1) + dir);
       renderSheetBody();
@@ -853,6 +856,7 @@
 
       overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
       overlay.querySelector('#saveBtn').addEventListener('click', async () => {
+        vibrate();
         if (selectedStore === 'Ostatné' && !customName.trim()) { showNameError = true; renderSheetBody(); return; }
         const finalDate = overlay.querySelector('#dateInput').value || todayStr();
         const storeName = selectedStore === 'Ostatné' ? customName.trim() : selectedStore;
@@ -979,6 +983,7 @@
     mainEl.querySelectorAll('.addIngredientBtn').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!mealSelectedListId) return;
+        vibrate();
         const original = btn.textContent;
         btn.textContent = '✓ Pridané';
         btn.disabled = true;
@@ -1090,6 +1095,7 @@
 
       overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
       overlay.querySelector('#saveMealBtn').addEventListener('click', async () => {
+        vibrate();
         const finalName = name.trim();
         if (!finalName) { showNameError = true; renderSheetBody(); return; }
 
@@ -1171,6 +1177,7 @@
 
     async function addNeedItem(name, fromCatalog) {
       if (!name) return;
+      vibrate();
       if (sb) { try { await sb.from('need_to_buy').insert({ name }); await refreshNeed(); } catch(e){console.error(e);} }
       else { needToBuy.push({id: uid(), name}); render(); }
       if (!fromCatalog) await maybeOfferAddToCatalog(name);
@@ -1187,6 +1194,7 @@
 
     mainEl.querySelectorAll('.del').forEach(btn => {
       btn.addEventListener('click', async () => {
+        vibrate();
         if (sb) { try { await sb.from('need_to_buy').delete().eq('id', btn.dataset.id); await refreshNeed(); } catch(e){console.error(e);} }
         else { needToBuy = needToBuy.filter(n=>n.id!==btn.dataset.id); render(); }
       });
@@ -1254,6 +1262,7 @@
     });
     container.querySelectorAll('.del').forEach(btn => {
       btn.addEventListener('click', async () => {
+        vibrate();
         if (sb) { try { await sb.from('catalog_items').delete().eq('id', btn.dataset.id); await refreshCatalog(); } catch(e){console.error(e);} }
         else { catalog = catalog.filter(c=>c.id!==btn.dataset.id); renderCatalogItemsList(); }
       });
@@ -1294,6 +1303,7 @@
       if (catSel) catSel.addEventListener('change', (e) => { category = e.target.value; });
       overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
       overlay.querySelector('#saveBtn').addEventListener('click', async () => {
+        vibrate();
         const finalName = name.trim();
         if (!finalName) { showError = true; draw(); return; }
         const finalCategory = store === 'Kaufland' ? category : '';
