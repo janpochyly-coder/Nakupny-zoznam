@@ -651,30 +651,73 @@
     vibrate();
     const bought = items.filter(i => i.done);
     const notBought = items.filter(i => !i.done);
-    const rowsHtml = (arr, checked) => arr.length === 0
-      ? '<div class="pempty">—</div>'
-      : arr.map(it => `<div class="prow"><span class="pbox">${checked ? '☑' : '☐'}</span><span>${escapeHtml(it.name)} — ${it.qty||1} ks${it.note ? ' (' + escapeHtml(it.note) + ')' : ''}</span></div>`).join('');
+    const total = items.length;
+    const pct = total ? Math.round((bought.length / total) * 100) : 0;
+
+    const groupByCategory = (arr) => {
+      const groups = {};
+      for (const it of arr) {
+        const cat = categoryLabelForItem(it);
+        (groups[cat] = groups[cat] || []).push(it);
+      }
+      const order = [...KAUFLAND_CATEGORIES, 'Ostatné'];
+      return order.filter(c => groups[c]).map(c => ({ cat: c, rows: groups[c] }));
+    };
+    const columnHtml = (arr, checked) => {
+      const groups = groupByCategory(arr);
+      if (groups.length === 0) return '<div class="pempty">—</div>';
+      return groups.map(g => `
+        <div class="cat-name">${escapeHtml(g.cat)}</div>
+        ${g.rows.map(it => `<div class="prow"><span class="pbox">${checked ? '☑' : '☐'}</span><span>${escapeHtml(it.name)}${it.qty>1?` ×${it.qty}`:''}${it.note ? ` <em>(${escapeHtml(it.note)})</em>` : ''}</span></div>`).join('')}
+      `).join('');
+    };
 
     const printHtml = `<!DOCTYPE html><html lang="sk"><head><meta charset="UTF-8">
 <title>Nákup - ${escapeHtml(list.store||'Zoznam')} - ${fmtDate(list.date||todayStr())}</title>
 <style>
-  @page { size: A4; margin: 16mm; }
+  @page { size: A4; margin: 14mm; }
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color:#1f2320; margin:0; }
-  h1 { font-size: 20px; margin: 0 0 4px; }
-  .sub { font-size: 12px; color:#6b7069; margin-bottom: 18px; }
-  h2 { font-size: 14px; margin: 18px 0 8px; border-bottom: 1px solid #e4e2dc; padding-bottom: 4px; }
-  .prow { display:flex; gap:8px; font-size: 13px; padding: 3px 0; }
+  .header { display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #1f2320; padding-bottom:10px; margin-bottom:16px; }
+  h1 { font-size: 22px; margin: 0; }
+  .date { font-size: 12px; color:#6b7069; }
+  .stats { display:flex; gap:10px; margin-bottom:20px; }
+  .stat { flex:1; text-align:center; background:#f7f6f3; border-radius:10px; padding:10px 6px; }
+  .stat-num { font-size:22px; font-weight:700; line-height:1.1; }
+  .stat-label { font-size:10px; color:#6b7069; text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+  .stat.good .stat-num { color:#3f7d5c; }
+  .stat.bad .stat-num { color:#c2564a; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+  .col-head { font-size:12px; text-transform:uppercase; letter-spacing:.04em; margin:0 0 10px; padding-bottom:6px; border-bottom:1px solid #e4e2dc; font-weight:700; }
+  .good-head { color:#3f7d5c; }
+  .bad-head { color:#c2564a; }
+  .cat-name { font-size:10.5px; font-weight:700; color:#6b7069; margin:10px 0 3px; text-transform:uppercase; letter-spacing:.03em; }
+  .cat-name:first-child { margin-top:0; }
+  .prow { display:flex; gap:6px; font-size:12.5px; padding:1.5px 0; }
   .pbox { flex-shrink:0; }
-  .pempty { font-size: 13px; color:#6b7069; }
+  .pempty { font-size:12px; color:#6b7069; }
 </style></head>
 <body>
-  <h1>${escapeHtml(list.store||'Zoznam')} - ${fmtDate(list.date||todayStr())}</h1>
-  <div class="sub">Kúpené: ${bought.length} &middot; Nekúpené: ${notBought.length}</div>
-  <h2>Kúpené (${bought.length})</h2>
-  ${rowsHtml(bought, true)}
-  <h2>Nekúpené (${notBought.length})</h2>
-  ${rowsHtml(notBought, false)}
+  <div class="header">
+    <h1>${escapeHtml(list.store||'Zoznam')}</h1>
+    <div class="date">${fmtDate(list.date||todayStr())}</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num">${total}</div><div class="stat-label">Celkom</div></div>
+    <div class="stat good"><div class="stat-num">${bought.length}</div><div class="stat-label">Kúpené</div></div>
+    <div class="stat bad"><div class="stat-num">${notBought.length}</div><div class="stat-label">Chýba</div></div>
+    <div class="stat"><div class="stat-num">${pct}%</div><div class="stat-label">Splnené</div></div>
+  </div>
+  <div class="cols">
+    <div class="col">
+      <div class="col-head good-head">Kúpené (${bought.length})</div>
+      ${columnHtml(bought, true)}
+    </div>
+    <div class="col">
+      <div class="col-head bad-head">Chýba (${notBought.length})</div>
+      ${columnHtml(notBought, false)}
+    </div>
+  </div>
 </body></html>`;
 
     const iframe = document.createElement('iframe');
