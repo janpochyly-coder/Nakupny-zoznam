@@ -243,9 +243,10 @@
   let dbSubTab = 'Kaufland';
   let catalogSearchQuery = '';
   let mealSelectedListId = null;
+  let listSortMode = 'added_asc'; // 'added_asc' | 'added_desc' | 'category'
 
   let lists = [];          // {id, store, date, createdAt}
-  let listItems = [];      // {id, listId, name, qty, note, done, catalogId, needId}
+  let listItems = [];      // {id, listId, name, qty, note, done, catalogId, needId, position}
   let needToBuy = [];      // {id, name}
   let catalog = [];        // {id, name, store, category}
   let meals = [];          // {id, name, createdAt}
@@ -268,7 +269,7 @@
 
   // ---------- ROW MAPPERS ----------
   const mapListRow = (r) => ({ id: r.id, store: r.store, date: r.list_date, createdAt: r.created_at ? new Date(r.created_at).getTime() : 0 });
-  const mapItemRow = (r) => ({ id: r.id, listId: r.list_id, name: r.name, qty: r.qty || 1, note: r.note || '', done: !!r.done, catalogId: r.catalog_id || undefined, needId: r.need_id || undefined });
+  const mapItemRow = (r) => ({ id: r.id, listId: r.list_id, name: r.name, qty: r.qty || 1, note: r.note || '', done: !!r.done, catalogId: r.catalog_id || undefined, needId: r.need_id || undefined, position: typeof r.position === 'number' ? r.position : 0 });
   const mapCatalogRow = (r) => ({ id: r.id, name: r.name, store: r.store, category: r.category || '' });
   const mapNeedRow = (r) => ({ id: r.id, name: r.name });
   const mapMealRow = (r) => ({ id: r.id, name: r.name, category: r.category || 'Hlavné jedlá', createdAt: r.created_at ? new Date(r.created_at).getTime() : 0 });
@@ -506,11 +507,35 @@
   }
 
   // ---------- LIST DETAIL (view only) ----------
+  function categoryLabelForItem(it) {
+    const c = it.catalogId ? catalog.find(c => c.id === it.catalogId) : null;
+    if (!c || c.store !== 'Kaufland' || !KAUFLAND_CATEGORIES.includes(c.category)) return 'Ostatné';
+    return c.category;
+  }
+  function categoryRankForItem(it) {
+    const c = it.catalogId ? catalog.find(c => c.id === it.catalogId) : null;
+    if (!c || c.store !== 'Kaufland') return KAUFLAND_CATEGORIES.length;
+    const idx = KAUFLAND_CATEGORIES.indexOf(c.category);
+    return idx === -1 ? KAUFLAND_CATEGORIES.length : idx;
+  }
+  function sortListItems(items, mode) {
+    const arr = [...items];
+    if (mode === 'category') {
+      arr.sort((a,b) => categoryRankForItem(a) - categoryRankForItem(b) || a.name.localeCompare(b.name, 'sk'));
+    } else if (mode === 'added_desc') {
+      arr.sort((a,b) => (b.position||0) - (a.position||0));
+    } else {
+      arr.sort((a,b) => (a.position||0) - (b.position||0));
+    }
+    return arr;
+  }
+
   function renderListDetail() {
     const list = lists.find(l => l.id === detailListId);
     if (!list) { detailListId = null; renderListsTab(); return; }
     pageTitle.textContent = 'Zoznam';
-    const items = [...itemsForList(list.id)].sort((a,b) => (a.done===b.done)?0:(a.done?1:-1));
+    let items = sortListItems(itemsForList(list.id), listSortMode);
+    items.sort((a,b) => (a.done===b.done)?0:(a.done?1:-1));
     let html = `
       <div class="backbar">
         <div class="backbar-left">
@@ -519,20 +544,36 @@
         </div>
         <button class="editbtn" id="editBtn">Upraviť</button>
       </div>
+      <div class="field-label" style="margin:10px 0 4px;">Zoradiť</div>
+      <select id="sortSelect" style="margin-bottom:10px;">
+        <option value="added_asc" ${listSortMode==='added_asc'?'selected':''}>Podľa pridania (najstaršie prvé)</option>
+        <option value="added_desc" ${listSortMode==='added_desc'?'selected':''}>Podľa pridania (najnovšie prvé)</option>
+        <option value="category" ${listSortMode==='category'?'selected':''}>Podľa kategórie</option>
+      </select>
       <ul class="plain">`;
-    html += items.map(it => `
+    let lastCat = null;
+    html += items.map(it => {
+      let heading = '';
+      if (listSortMode === 'category') {
+        const cat = categoryLabelForItem(it);
+        if (cat !== lastCat) { heading = `<div class="cat-heading">${escapeHtml(cat)}</div>`; lastCat = cat; }
+      }
+      return `${heading}
         <li class="row ${it.done?'done':''}">
           <button class="check" data-id="${it.id}">
             <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </button>
           <span class="row-text">${escapeHtml(it.name)} — ${it.qty||1} ks${it.note ? `<span class="row-sub">${escapeHtml(it.note)}</span>` : ''}</span>
-        </li>`).join('');
+        </li>`;
+    }).join('');
     html += `</ul>`;
     if (items.length === 0) html += `<div class="empty">Žiadne položky. Uprav zoznam a pridaj nejaké.</div>`;
     mainEl.innerHTML = html;
 
     document.getElementById('backBtn').addEventListener('click', () => { detailListId = null; render(); });
     document.getElementById('editBtn').addEventListener('click', () => openListSheet(list));
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) sortSelect.addEventListener('change', () => { listSortMode = sortSelect.value; render(); });
     mainEl.querySelectorAll('.check').forEach(btn => {
       btn.addEventListener('click', () => {
         const it = listItems.find(i => i.id === btn.dataset.id);
@@ -815,7 +856,7 @@
         if (selectedStore === 'Ostatné' && !customName.trim()) { showNameError = true; renderSheetBody(); return; }
         const finalDate = overlay.querySelector('#dateInput').value || todayStr();
         const storeName = selectedStore === 'Ostatné' ? customName.trim() : selectedStore;
-        const cleanedItems = sheetItems.map(i => ({ id: i.id, name: i.name, qty: i.qty || 1, note: i.note || '', done: !!i.done, catalogId: i.catalogId, needId: i.needId }));
+        const cleanedItems = sheetItems.map((i, idx) => ({ id: i.id, name: i.name, qty: i.qty || 1, note: i.note || '', done: !!i.done, catalogId: i.catalogId, needId: i.needId, position: idx }));
         const usedNeedIds = sheetItems.filter(i => i.needId).map(i => i.needId);
 
         if (sb) {
@@ -830,7 +871,7 @@
               listId = newList.id;
             }
             if (cleanedItems.length) {
-              const rows = cleanedItems.map(i => ({ list_id: listId, name: i.name, qty: i.qty, note: i.note, done: i.done, catalog_id: i.catalogId || null, need_id: i.needId || null }));
+              const rows = cleanedItems.map(i => ({ list_id: listId, name: i.name, qty: i.qty, note: i.note, done: i.done, catalog_id: i.catalogId || null, need_id: i.needId || null, position: i.position }));
               const { error: e2 } = await sb.from('shopping_list_items').insert(rows);
               if (e2) throw e2;
             }
@@ -942,11 +983,12 @@
         btn.textContent = '✓ Pridané';
         btn.disabled = true;
         try {
+          const nextPos = Math.max(0, ...itemsForList(mealSelectedListId).map(i => (i.position || 0) + 1));
           if (sb) {
-            await sb.from('shopping_list_items').insert({ list_id: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalog_id: btn.dataset.catalogId || null });
+            await sb.from('shopping_list_items').insert({ list_id: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalog_id: btn.dataset.catalogId || null, position: nextPos });
             await refreshListItems();
           } else {
-            listItems.push({ id: uid(), listId: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalogId: btn.dataset.catalogId || undefined });
+            listItems.push({ id: uid(), listId: mealSelectedListId, name: btn.dataset.name, qty: 1, note: '', done: false, catalogId: btn.dataset.catalogId || undefined, position: nextPos });
           }
         } catch(e) { console.error(e); }
         setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 1200);
