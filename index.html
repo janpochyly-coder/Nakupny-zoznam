@@ -414,6 +414,37 @@
       draw();
     });
   }
+  function askQuantity(name) {
+    return new Promise((resolve) => {
+      let qty = 1;
+      const ov = document.createElement('div');
+      ov.className = 'overlay';
+      document.body.appendChild(ov);
+      function draw() {
+        ov.innerHTML = `<div class="sheet" style="max-width:360px;">
+          <h2 style="font-size:16px;">${escapeHtml(name)}</h2>
+          <div class="field-label">Počet kusov</div>
+          <div class="si-qty" style="justify-content:center; gap:14px; margin:10px 0 4px;">
+            <button type="button" class="qtyBtn" id="qtyMinus">−</button>
+            <input type="number" min="1" id="qtyVal" value="${qty}" style="width:72px; text-align:center; font-size:18px; padding:8px;">
+            <button type="button" class="qtyBtn" id="qtyPlus">+</button>
+          </div>
+          <div class="sheet-actions">
+            <button class="btn-secondary" id="qtyCancel">Zrušiť</button>
+            <button class="btn-primary" id="qtyOk">Pridať</button>
+          </div>
+        </div>`;
+        ov.querySelector('#qtyMinus').addEventListener('click', () => { qty = Math.max(1, qty - 1); draw(); });
+        ov.querySelector('#qtyPlus').addEventListener('click', () => { qty = qty + 1; draw(); });
+        const valInput = ov.querySelector('#qtyVal');
+        valInput.addEventListener('input', () => { qty = Math.max(1, parseInt(valInput.value, 10) || 1); });
+        valInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { ov.remove(); resolve(Math.max(1, parseInt(valInput.value, 10) || 1)); } });
+        ov.querySelector('#qtyCancel').addEventListener('click', () => { ov.remove(); resolve(null); });
+        ov.querySelector('#qtyOk').addEventListener('click', () => { const v = Math.max(1, parseInt(ov.querySelector('#qtyVal').value, 10) || 1); ov.remove(); resolve(v); });
+      }
+      draw();
+    });
+  }
   async function maybeOfferAddToCatalog(name, defaultStore) {
     if (catalogHasName(name)) return;
     const result = await offerAddToCatalogSheet(name, defaultStore);
@@ -553,6 +584,7 @@
     let showNameError = false;
     let quickSearchQuery = '';
     const openCategories = new Set();
+    let currentItemsOpen = false;
 
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
@@ -581,11 +613,14 @@
       box.style.display = 'block';
       box.innerHTML = matches.map(m => `<button type="button" class="suggestion-item" data-id="${m.id}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</button>`).join('');
       box.querySelectorAll('.suggestion-item').forEach(btn => {
-        btn.addEventListener('click', () => {
+        btn.addEventListener('click', async () => {
           const already = sheetItems.some(i => i.catalogId === btn.dataset.id);
           quickSearchQuery = '';
-          if (!already) addSheetItem({ id: uid(), name: btn.dataset.name, qty: 1, note: '', done: false, catalogId: btn.dataset.id });
-          else renderSheetBody();
+          hideQuickSuggestions();
+          if (already) { renderSheetBody(); return; }
+          const qty = await askQuantity(btn.dataset.name);
+          if (qty == null) { renderSheetBody(); return; }
+          addSheetItem({ id: uid(), name: btn.dataset.name, qty, note: '', done: false, catalogId: btn.dataset.id });
         });
       });
     }
@@ -594,7 +629,9 @@
       const v = quickSearchQuery.trim();
       if (!v) return;
       quickSearchQuery = '';
-      addSheetItem({ id: uid(), name: v, qty: 1, note: '', done: false });
+      const qty = await askQuantity(v);
+      if (qty == null) { renderSheetBody(); return; }
+      addSheetItem({ id: uid(), name: v, qty, note: '', done: false });
       await maybeOfferAddToCatalog(v, selectedStore);
       renderSheetBody();
     }
@@ -656,7 +693,11 @@
           <div class="suggestions" id="quickSearchSuggestions" style="display:none;"></div>
         </div>
 
-        <div class="field-label">Položky v zozname (${sheetItems.length})</div>
+        <button type="button" class="cat-accordion-row" id="currentItemsToggle" style="margin-top:16px;">
+          <span>Položky v zozname (${sheetItems.length})</span>
+          <span class="cat-accordion-meta">${currentItemsOpen ? '▲' : '▼'}</span>
+        </button>
+        ${currentItemsOpen ? `
         <div id="currentItems">
           ${sheetItems.length === 0 ? '<div class="empty" style="padding:10px 0;">Zatiaľ žiadne položky</div>' : sheetItems.map(it => `
             <div class="sheet-item" data-id="${it.id}">
@@ -675,7 +716,7 @@
                 : `<button class="note-toggle" data-id="${it.id}">+ poznámka</button>`}
             </div>
           `).join('')}
-        </div>
+        </div>` : ''}
 
         <div class="field-label">Pridať z databázy (${selectedStore})</div>
         <div id="catalogPick">${catalogAccordionHtml()}</div>
@@ -713,13 +754,16 @@
       const quickAddBtn = overlay.querySelector('#quickSearchAddBtn');
       if (quickAddBtn) quickAddBtn.addEventListener('click', () => { hideQuickSuggestions(); handleQuickSearchAdd(); });
 
-      overlay.querySelectorAll('.cat-accordion-row').forEach(btn => {
+      overlay.querySelectorAll('.cat-accordion-row[data-cat]').forEach(btn => {
         btn.addEventListener('click', () => {
           const key = btn.dataset.cat;
           if (openCategories.has(key)) openCategories.delete(key); else openCategories.add(key);
           renderSheetBody();
         });
       });
+      const currentItemsToggle = overlay.querySelector('#currentItemsToggle');
+      if (currentItemsToggle) currentItemsToggle.addEventListener('click', () => { currentItemsOpen = !currentItemsOpen; renderSheetBody(); });
+
       const nameInput = overlay.querySelector('#customNameInput');
       if (nameInput) nameInput.addEventListener('input', () => { customName = nameInput.value; });
 
@@ -748,15 +792,21 @@
       });
 
       overlay.querySelectorAll('#catalogPick input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          if (cb.checked) addSheetItem({ id: uid(), name: cb.dataset.name, qty: 1, note: '', done: false, catalogId: cb.dataset.id });
-          else { sheetItems = sheetItems.filter(i => i.catalogId !== cb.dataset.id); renderSheetBody(); }
+        cb.addEventListener('change', async () => {
+          if (cb.checked) {
+            const qty = await askQuantity(cb.dataset.name);
+            if (qty == null) { renderSheetBody(); return; }
+            addSheetItem({ id: uid(), name: cb.dataset.name, qty, note: '', done: false, catalogId: cb.dataset.id });
+          } else { sheetItems = sheetItems.filter(i => i.catalogId !== cb.dataset.id); renderSheetBody(); }
         });
       });
       overlay.querySelectorAll('#needPick input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          if (cb.checked) addSheetItem({ id: uid(), name: cb.dataset.name, qty: 1, note: '', done: false, needId: cb.dataset.id });
-          else { sheetItems = sheetItems.filter(i => i.needId !== cb.dataset.id); renderSheetBody(); }
+        cb.addEventListener('change', async () => {
+          if (cb.checked) {
+            const qty = await askQuantity(cb.dataset.name);
+            if (qty == null) { renderSheetBody(); return; }
+            addSheetItem({ id: uid(), name: cb.dataset.name, qty, note: '', done: false, needId: cb.dataset.id });
+          } else { sheetItems = sheetItems.filter(i => i.needId !== cb.dataset.id); renderSheetBody(); }
         });
       });
 
