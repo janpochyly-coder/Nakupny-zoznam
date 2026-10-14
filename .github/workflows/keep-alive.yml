@@ -1,0 +1,18 @@
+name: keep-supabase-awake
+
+on:
+  schedule:
+    # Every Monday and Thursday at 06:00 UTC — well under Supabase's
+    # ~7-day inactivity pause threshold.
+    - cron: '0 6 * * 1,4'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST API
+        run: |
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" \
+            "https://qsuinjpanjqwoxdwsjag.supabase.co/rest/v1/catalog_items?select=id&limit=1" \
+            -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzdWluanBhbmpxd294ZHdzamFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk5MDY0MzgsImV4cCI6MjEwNTQ4MjQzOH0.M6zGi8y_V-LJIcNL3sdIsoi4STtYK0bAgTruh3qmZ5s"

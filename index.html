@@ -142,6 +142,15 @@
   .pick-row input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); flex-shrink: 0; }
   .pick-row label { flex: 1; font-size: 14px; }
 
+  .cat-accordion-row {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 6px; font-size: 14px; font-weight: 600;
+    color: var(--text); cursor: pointer;
+  }
+  .cat-accordion-meta { font-size: 12px; color: var(--muted); font-weight: 500; }
+  .cat-accordion-body { padding: 4px 0 4px 6px; margin-bottom: 6px; }
+
   .sheet-item {
     background: var(--card); border: 1px solid var(--border); border-radius: 10px;
     padding: 10px 12px; margin-bottom: 6px;
@@ -542,6 +551,8 @@
       : [];
     const openNotes = new Set(sheetItems.filter(i => i.note).map(i => i.id));
     let showNameError = false;
+    let quickSearchQuery = '';
+    const openCategories = new Set();
 
     const overlay = document.createElement('div');
     overlay.className = 'overlay';
@@ -555,23 +566,83 @@
       renderSheetBody();
     }
 
-    async function handleManualAdd() {
-      const inp = overlay.querySelector('#manualInput');
-      const v = inp.value.trim();
-      if (!v) return;
-      inp.value = '';
-      addSheetItem({ id: uid(), name: v, qty: 1, note: '', done: false });
-      await maybeOfferAddToCatalog(v, selectedStore);
+    function hideQuickSuggestions() {
+      const box = overlay.querySelector('#quickSearchSuggestions');
+      if (box) { box.style.display = 'none'; box.innerHTML = ''; }
     }
 
-    function catalogPickHtml() {
-      return buildCatalogPickerHtml(selectedStore, (id) => sheetItems.some(i => i.catalogId === id), 'cat');
+    function renderQuickSuggestions() {
+      const box = overlay.querySelector('#quickSearchSuggestions');
+      if (!box) return;
+      const q = quickSearchQuery.trim().toLowerCase();
+      if (!q) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      const matches = catalog.filter(c => c.store === selectedStore && c.name.toLowerCase().includes(q)).slice(0, 8);
+      if (matches.length === 0) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.style.display = 'block';
+      box.innerHTML = matches.map(m => `<button type="button" class="suggestion-item" data-id="${m.id}" data-name="${escapeHtml(m.name)}">${escapeHtml(m.name)}</button>`).join('');
+      box.querySelectorAll('.suggestion-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const already = sheetItems.some(i => i.catalogId === btn.dataset.id);
+          quickSearchQuery = '';
+          if (!already) addSheetItem({ id: uid(), name: btn.dataset.name, qty: 1, note: '', done: false, catalogId: btn.dataset.id });
+          else renderSheetBody();
+        });
+      });
+    }
+
+    async function handleQuickSearchAdd() {
+      const v = quickSearchQuery.trim();
+      if (!v) return;
+      quickSearchQuery = '';
+      addSheetItem({ id: uid(), name: v, qty: 1, note: '', done: false });
+      await maybeOfferAddToCatalog(v, selectedStore);
+      renderSheetBody();
+    }
+
+    function catalogAccordionHtml() {
+      const items = catalog.filter(c => c.store === selectedStore);
+      if (items.length === 0) return '<div class="empty" style="padding:10px 0;">V tejto databáze zatiaľ nič nie je</div>';
+
+      const rowHtml = (c) => `
+        <div class="pick-row">
+          <input type="checkbox" id="cat-${c.id}" data-id="${c.id}" data-name="${escapeHtml(c.name)}" ${sheetItems.some(i=>i.catalogId===c.id)?'checked':''}>
+          <label for="cat-${c.id}">${escapeHtml(c.name)}</label>
+        </div>`;
+
+      function accordionRow(key, label, inCatItems) {
+        const isOpen = openCategories.has(key);
+        return `
+          <button type="button" class="cat-accordion-row" data-cat="${key}">
+            <span>${escapeHtml(label)}</span>
+            <span class="cat-accordion-meta">${inCatItems.length} ${isOpen ? '▲' : '▼'}</span>
+          </button>
+          ${isOpen ? `<div class="cat-accordion-body">${inCatItems.map(rowHtml).join('')}</div>` : ''}`;
+      }
+
+      if (selectedStore !== 'Kaufland') return accordionRow('__all__', selectedStore, items);
+
+      let out = '';
+      for (const cat of KAUFLAND_CATEGORIES) {
+        const inCat = items.filter(i => i.category === cat);
+        if (inCat.length === 0) continue;
+        out += accordionRow(cat, cat, inCat);
+      }
+      const uncategorized = items.filter(i => !i.category || !KAUFLAND_CATEGORIES.includes(i.category));
+      if (uncategorized.length) out += accordionRow('__other__', 'Ostatné', uncategorized);
+      return out;
     }
 
     function renderSheetBody() {
       overlay.innerHTML = `
       <div class="sheet">
         <h2>${isEdit ? 'Upraviť nákupný zoznam' : 'Nový nákupný zoznam'}</h2>
+
+        <div class="field-label">Hľadať / pridať položku</div>
+        <div class="add-row" style="margin:0 0 14px;">
+          <input type="text" id="quickSearchInput" placeholder="Píš názov položky…" autocomplete="off" value="${escapeHtml(quickSearchQuery)}">
+          <button class="add-btn" id="quickSearchAddBtn">+</button>
+          <div class="suggestions" id="quickSearchSuggestions" style="display:none;"></div>
+        </div>
 
         <div class="field-label">Databáza / obchod</div>
         <div class="store-pick" id="storePick">
@@ -607,7 +678,7 @@
         </div>
 
         <div class="field-label">Pridať z databázy (${selectedStore})</div>
-        <div id="catalogPick">${catalogPickHtml()}</div>
+        <div id="catalogPick">${catalogAccordionHtml()}</div>
 
         <div class="field-label">Pridať z "Treba kúpiť"</div>
         <div id="needPick">
@@ -616,12 +687,6 @@
               <input type="checkbox" id="need-${n.id}" data-id="${n.id}" data-name="${escapeHtml(n.name)}" ${sheetItems.some(i=>i.needId===n.id)?'checked':''}>
               <label for="need-${n.id}">${escapeHtml(n.name)}</label>
             </div>`).join('')}
-        </div>
-
-        <div class="field-label">Pridať manuálne</div>
-        <div class="add-row" style="margin:0 0 6px;">
-          <input type="text" id="manualInput" placeholder="Ďalšia položka…">
-          <button class="add-btn" id="manualAddBtn">+</button>
         </div>
 
         <div class="sheet-actions">
@@ -634,6 +699,24 @@
         chip.addEventListener('click', () => {
           selectedStore = chip.dataset.store;
           showNameError = false;
+          quickSearchQuery = '';
+          openCategories.clear();
+          renderSheetBody();
+        });
+      });
+
+      const quickInput = overlay.querySelector('#quickSearchInput');
+      if (quickInput) {
+        quickInput.addEventListener('input', () => { quickSearchQuery = quickInput.value; renderQuickSuggestions(); });
+        quickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { hideQuickSuggestions(); handleQuickSearchAdd(); } });
+      }
+      const quickAddBtn = overlay.querySelector('#quickSearchAddBtn');
+      if (quickAddBtn) quickAddBtn.addEventListener('click', () => { hideQuickSuggestions(); handleQuickSearchAdd(); });
+
+      overlay.querySelectorAll('.cat-accordion-row').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const key = btn.dataset.cat;
+          if (openCategories.has(key)) openCategories.delete(key); else openCategories.add(key);
           renderSheetBody();
         });
       });
@@ -676,9 +759,6 @@
           else { sheetItems = sheetItems.filter(i => i.needId !== cb.dataset.id); renderSheetBody(); }
         });
       });
-
-      overlay.querySelector('#manualAddBtn').addEventListener('click', handleManualAdd);
-      overlay.querySelector('#manualInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') handleManualAdd(); });
 
       overlay.querySelector('#cancelBtn').addEventListener('click', () => overlay.remove());
       overlay.querySelector('#saveBtn').addEventListener('click', async () => {
