@@ -637,13 +637,6 @@
       <div class="sheet">
         <h2>${isEdit ? 'Upraviť nákupný zoznam' : 'Nový nákupný zoznam'}</h2>
 
-        <div class="field-label">Hľadať / pridať položku</div>
-        <div class="add-row" style="margin:0 0 14px;">
-          <input type="text" id="quickSearchInput" placeholder="Píš názov položky…" autocomplete="off" value="${escapeHtml(quickSearchQuery)}">
-          <button class="add-btn" id="quickSearchAddBtn">+</button>
-          <div class="suggestions" id="quickSearchSuggestions" style="display:none;"></div>
-        </div>
-
         <div class="field-label">Databáza / obchod</div>
         <div class="store-pick" id="storePick">
           ${STORE_OPTIONS.map(s => `<button type="button" class="store-chip ${s===selectedStore?'sel':''}" data-store="${s}">${s}</button>`).join('')}
@@ -655,6 +648,13 @@
 
         <div class="field-label">Dátum</div>
         <input type="date" id="dateInput" value="${date}">
+
+        <div class="field-label">Hľadať / pridať položku</div>
+        <div class="add-row" style="margin:0 0 14px;">
+          <input type="text" id="quickSearchInput" placeholder="Píš názov položky…" autocomplete="off" value="${escapeHtml(quickSearchQuery)}">
+          <button class="add-btn" id="quickSearchAddBtn">+</button>
+          <div class="suggestions" id="quickSearchSuggestions" style="display:none;"></div>
+        </div>
 
         <div class="field-label">Položky v zozname (${sheetItems.length})</div>
         <div id="currentItems">
