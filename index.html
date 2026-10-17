@@ -246,6 +246,7 @@
   let detailMealId = null;
   let dbSubTab = 'Kaufland';
   let catalogSearchQuery = '';
+  const catalogOpenCategories = new Set();
   let mealSelectedListId = null;
   let listSortMode = 'added_asc'; // 'added_asc' | 'added_desc' | 'category'
 
@@ -1398,7 +1399,7 @@
     mainEl.innerHTML = html;
 
     mainEl.querySelectorAll('.db-subtab').forEach(btn => {
-      btn.addEventListener('click', () => { dbSubTab = btn.dataset.store; catalogSearchQuery = ''; render(); });
+      btn.addEventListener('click', () => { dbSubTab = btn.dataset.store; catalogSearchQuery = ''; catalogOpenCategories.clear(); render(); });
     });
 
     const searchInput = document.getElementById('catalogSearch');
@@ -1427,18 +1428,33 @@
     } else if (dbSubTab !== 'Kaufland') {
       html = `<ul class="plain">` + items.slice().sort((a,b)=>a.name.localeCompare(b.name,'sk')).map(rowHtml).join('') + `</ul>`;
     } else {
+      const catGroups = [];
       for (const cat of KAUFLAND_CATEGORIES) {
         const inCat = items.filter(i => i.category === cat).sort((a,b)=>a.name.localeCompare(b.name,'sk'));
-        if (inCat.length === 0) continue;
-        html += `<div class="cat-heading">${cat}</div><ul class="plain">` + inCat.map(rowHtml).join('') + `</ul>`;
+        if (inCat.length) catGroups.push({ cat, rows: inCat });
       }
       const uncategorized = items.filter(i => !i.category || !KAUFLAND_CATEGORIES.includes(i.category));
-      if (uncategorized.length) {
-        html += `<div class="cat-heading">Ostatné</div><ul class="plain">` + uncategorized.map(rowHtml).join('') + `</ul>`;
-      }
+      if (uncategorized.length) catGroups.push({ cat: 'Ostatné', rows: uncategorized });
+
+      html = catGroups.map(g => {
+        const isOpen = q ? true : catalogOpenCategories.has(g.cat);
+        return `
+          <button type="button" class="cat-accordion-row" data-cat="${escapeHtml(g.cat)}">
+            <span>${escapeHtml(g.cat)}</span>
+            <span class="cat-accordion-meta">${g.rows.length} ${isOpen ? '▲' : '▼'}</span>
+          </button>
+          ${isOpen ? `<div class="cat-accordion-body"><ul class="plain">${g.rows.map(rowHtml).join('')}</ul></div>` : ''}`;
+      }).join('');
     }
     container.innerHTML = html;
 
+    container.querySelectorAll('.cat-accordion-row[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.dataset.cat;
+        if (catalogOpenCategories.has(key)) catalogOpenCategories.delete(key); else catalogOpenCategories.add(key);
+        renderCatalogItemsList();
+      });
+    });
     container.querySelectorAll('.edit').forEach(btn => {
       btn.addEventListener('click', () => {
         const item = catalog.find(c => c.id === btn.dataset.id);
